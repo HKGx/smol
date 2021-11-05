@@ -1,2 +1,2 @@
-# smolmath
-A math parsing library
+# Smol
+A programming language
