@@ -32,6 +32,7 @@ class TokenType(Enum):
     INTEGER_LITERAL = auto()
     FLOAT_LITERAL = auto()
     STRING_LITERAL = auto()
+    KEYWORD = auto()
     IDENTIFIER_LITERAL = auto()
 
 
@@ -69,6 +70,8 @@ SINGLE_CHAR_TOKENS = {
     "<": TokenType.SMALLER_THAN,
     ">": TokenType.GREATER_THAN,
 }
+
+KEYWORDS = ["if", "else", "let"]
 
 
 class Tokenizer:
@@ -124,9 +127,14 @@ class Tokenizer:
         while not self.ended and self.current_character.isalnum():
             self.current_source_idx += 1
             self.current_column += 1
+
+        image = self.source[start : self.current_source_idx]
+
         return Token(
-            type=TokenType.IDENTIFIER_LITERAL,
-            image=self.source[start : self.current_source_idx],
+            type=TokenType.KEYWORD
+            if image in KEYWORDS
+            else TokenType.IDENTIFIER_LITERAL,
+            image=image,
             line=self.current_line,
             column=self.current_column,
         )
