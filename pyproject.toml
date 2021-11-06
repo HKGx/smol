@@ -1,0 +1,20 @@
+[tool.poetry]
+name = "smol"
+version = "0.1.0"
+description = "A programming language"
+authors = ["HKG <mail@hkgdoes.dev>"]
+license = "MIT"
+
+[tool.poetry.dependencies]
+python = "^3.10"
+pytest = "^6.2.5"
+watchdog = "^2.1.6"
+
+[tool.poetry.dev-dependencies]
+black = "^21.10b0"
+mypy = "^0.910"
+PyYAML = "^6.0"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
