@@ -18,7 +18,6 @@ class IntegerExpression(Expression):
 class IdentifierExpression(Expression):
     name: str
     
-
 @dataclass
 class AdditionExpression(Expression):
     left: Expression
@@ -36,6 +35,11 @@ class NegationExpression(Expression):
     value: Expression
 
 @dataclass
+
+class FunctionCallExpression(Expression):
+    name: IdentifierExpression
+    args: list[Expression]
+@dataclass
 class Statement:
     pass
 
@@ -50,6 +54,9 @@ class Program:
 
 
 class Parser:
+    """
+    Parsers tokens into an AST.
+    """
     tokens: list[Token]
     current: int = 0
 
@@ -76,7 +83,7 @@ class Parser:
 
     def addition(self) -> Expression:
         lhs = self.multiplication()
-        while (self.current_token.match(TokenType.PLUS, TokenType.MINUS)):
+        while (not self.ended and self.current_token.match(TokenType.PLUS, TokenType.MINUS)):
             assert self.current_token.image == "+" or self.current_token.image == "-"
             sign: Literal["+"] | Literal["-"] = self.current_token.image
             self.next()
@@ -85,7 +92,7 @@ class Parser:
 
     def multiplication(self) -> Expression:
         lhs = self.negation()
-        while (self.current_token.match(TokenType.STAR, TokenType.SLASH)):
+        while (not self.ended and self.current_token.match(TokenType.STAR, TokenType.SLASH)):
             assert self.current_token.image == "*" or self.current_token.image == "/"
             sign: Literal["*"] | Literal["/"] = self.current_token.image
             self.next()
@@ -107,10 +114,14 @@ class Parser:
             case Token(TokenType.LEFT_PAREN):
                 expr =  self.parenthesized_expression()
             case Token(TokenType.IDENTIFIER_LITERAL):
-                expr =  IdentifierExpression(self.current_token.image)
+                if (self.peek_next and self.peek_next.type == TokenType.LEFT_PAREN):
+                    expr = self.function_call()
+                else: 
+                    expr = IdentifierExpression(self.current_token.image)
             case _:
-                assert False, "unreachable"
+                assert False, "Expected expression token"
         self.next()
+        assert expr is not None, "Expected expression"
         return expr
 
     def parenthesized_expression(self) -> Expression:
@@ -124,6 +135,15 @@ class Parser:
         self.next()
         return expr
     
+    def function_call(self) -> Expression:
+        name = IdentifierExpression(self.current_token.image)
+        self.next()
+        assert self.current_token.type == TokenType.LEFT_PAREN
+        # TODO: parse arguments
+        self.next()
+        assert self.current_token.type == TokenType.RIGHT_PAREN
+        self.next()
+        return FunctionCallExpression(name, [])
 
 
 
