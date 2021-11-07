@@ -41,7 +41,6 @@ class NegationExpression(Expression):
     value: Expression
 
 @dataclass
-
 class FunctionCallExpression(Expression):
     name: IdentifierExpression
     args: list[Expression]
@@ -50,9 +49,14 @@ class FunctionCallExpression(Expression):
 class Statement:
     pass
 
+@dataclass
 class ExpressionStatement(Statement):
     value: Expression
 
+@dataclass
+class AssignmentStatement(Statement):
+    name: IdentifierExpression
+    value: Expression
 
 
 @dataclass
@@ -144,7 +148,6 @@ class Parser:
             assert False
         self.next()
         expr = self.expression()
-        self.next()
         if (self.current_token.type != TokenType.RIGHT_PAREN):
             assert False
         self.next()
@@ -154,11 +157,16 @@ class Parser:
         name = IdentifierExpression(self.current_token.image)
         self.next()
         assert self.current_token.type == TokenType.LEFT_PAREN
-        # TODO: parse arguments
         self.next()
+        # parse arguments
+        args = []
+        while (not self.ended and self.current_token.type != TokenType.RIGHT_PAREN):
+            if (self.current_token.type == TokenType.COMMA):
+                self.next()
+            args.append(self.expression())
         assert self.current_token.type == TokenType.RIGHT_PAREN
         self.next()
-        return FunctionCallExpression(name, [])
+        return FunctionCallExpression(name, args)
 
 
 
