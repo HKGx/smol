@@ -31,6 +31,12 @@ class MultiplicationExpression(Expression):
     right: Expression
 
 @dataclass
+class ExponentatiotnExpression(Expression):
+    left: Expression
+    sign: Literal["^"]
+    right: Expression
+
+@dataclass
 class NegationExpression(Expression):
     value: Expression
 
@@ -39,6 +45,7 @@ class NegationExpression(Expression):
 class FunctionCallExpression(Expression):
     name: IdentifierExpression
     args: list[Expression]
+
 @dataclass
 class Statement:
     pass
@@ -91,20 +98,28 @@ class Parser:
         return lhs
 
     def multiplication(self) -> Expression:
-        lhs = self.negation()
+        lhs = self.exponentiation()
         while (not self.ended and self.current_token.match(TokenType.STAR, TokenType.SLASH)):
             assert self.current_token.image == "*" or self.current_token.image == "/"
             sign: Literal["*"] | Literal["/"] = self.current_token.image
             self.next()
-            lhs = MultiplicationExpression(lhs, sign, self.negation())
-            self.next()
+            lhs = MultiplicationExpression(lhs, sign, self.exponentiation())
         return lhs
+
+    def exponentiation(self) -> Expression:
+        lhs = self.negation()
+        while (not self.ended and self.current_token.type == TokenType.CARET):
+            self.next()
+            lhs = ExponentatiotnExpression(lhs, "^", self.exponentiation()) # it just works?
+        return lhs
+
 
     def negation(self) -> Expression:
         if self.current_token.type == TokenType.MINUS:
             self.next()
             return NegationExpression(self.atomic())
         return self.atomic()
+
 
     def atomic(self) -> Expression:
         expr: Expression
