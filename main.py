@@ -1,3 +1,4 @@
+from smol.interpret import Interpreter
 from smol.tokenizer import Tokenizer
 from smol.parser import AdditionExpression, AssignmentStatement, ExponentatiotnExpression, Expression, ExpressionStatement, FunctionCallExpression, IdentifierExpression, IntegerExpression, MultiplicationExpression, NegationExpression, Parser, Program, Statement
 from pprint import pprint
@@ -32,10 +33,12 @@ def stringify(expression: Expression) -> str:
     raise Exception(f"Unexpected expression: {expression}")
 
 if __name__ == "__main__":
-    tokens = Tokenizer("""x * 3
-    let x = 2 * 1""").tokenize()
-    pprint(tokens)
+    tokens = Tokenizer("""let x = 2 * 1
+    print(x)""").tokenize()
+    # pprint(tokens)
     parser = Parser(tokens)
     expr = parser.program()
-    pprint(expr)
-    print(program(expr))
+    #pprint(expr)
+    #print(program(expr))
+    interpreter = Interpreter(expr)
+    interpreter.run()
