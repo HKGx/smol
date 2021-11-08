@@ -1,7 +1,17 @@
 from smol.tokenizer import Tokenizer
-from smol.parser import AdditionExpression, ExponentatiotnExpression, Expression, FunctionCallExpression, IdentifierExpression, IntegerExpression, MultiplicationExpression, NegationExpression, Parser
+from smol.parser import AdditionExpression, AssignmentStatement, ExponentatiotnExpression, Expression, ExpressionStatement, FunctionCallExpression, IdentifierExpression, IntegerExpression, MultiplicationExpression, NegationExpression, Parser, Program, Statement
 from pprint import pprint
 
+def program(program: Program) -> str:
+    return '\n'.join(statement(stmt) for stmt in program.statements)
+
+def statement(stmt: Statement) -> str:
+    match stmt:
+        case AssignmentStatement(name, value):
+            return f"{stringify(name)} = {stringify(value)}"
+        case ExpressionStatement(expression):
+            return stringify(expression)
+    raise Exception(f"Unexpected statement: {stmt}")
 
 def stringify(expression: Expression) -> str:
     match expression:
@@ -22,9 +32,10 @@ def stringify(expression: Expression) -> str:
     raise Exception(f"Unexpected expression: {expression}")
 
 if __name__ == "__main__":
-    tokens = Tokenizer("3^2^2^2 * (2 + 2 + 2 + 2)").tokenize()
+    tokens = Tokenizer("""x * 3
+    let x = 2 * 1""").tokenize()
     pprint(tokens)
     parser = Parser(tokens)
-    expr = parser.expression()
+    expr = parser.program()
     pprint(expr)
-    print(stringify(expr))
+    print(program(expr))

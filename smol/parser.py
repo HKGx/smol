@@ -1,10 +1,7 @@
-from enum import Enum, auto
 from dataclasses import dataclass
-from locale import currency
-from sre_parse import State
-from typing import Literal
+from typing import Callable, Literal, TypeVar
 from smol.tokenizer import Token, TokenType
-
+from textwrap import dedent
 
 @dataclass
 class Expression:
@@ -63,6 +60,7 @@ class AssignmentStatement(Statement):
 class Program:
     statements: list[Statement]
 
+RuleReturnType = TypeVar("RuleReturnType", Expression, Program, Statement)
 
 class Parser:
     """
@@ -138,25 +136,30 @@ class Parser:
                 else: 
                     expr = IdentifierExpression(self.current_token.image)
             case _:
-                assert False, "Expected expression token"
+                # TODO: improve error reporting
+                start = max(0, self.current - 10)
+                end = min(len(self.tokens), self.current + 10)
+                last_tokens_images = [t.image for t in self.tokens[start:end]]
+                assert False, dedent(f"""
+                Expected integer, identifier, function call or `(` but got `{self.current_token.image}` at {self.current_token.line}:{self.current_token.column}.
+                {" ".join(last_tokens_images)}
+                """)
         self.next()
-        assert expr is not None, "Expected expression"
+        assert expr is not None, "Technically unreachable"
         return expr
 
     def parenthesized_expression(self) -> Expression:
-        if (self.current_token.type != TokenType.LEFT_PAREN): 
-            assert False
+        assert self.current_token.type == TokenType.LEFT_PAREN, "Expected '('"
         self.next()
         expr = self.expression()
-        if (self.current_token.type != TokenType.RIGHT_PAREN):
-            assert False
+        assert self.current_token.type == TokenType.RIGHT_PAREN, "Expected ')'"
         self.next()
         return expr
     
     def function_call(self) -> Expression:
         name = IdentifierExpression(self.current_token.image)
         self.next()
-        assert self.current_token.type == TokenType.LEFT_PAREN
+        assert self.current_token.type == TokenType.LEFT_PAREN, "Expected '('"
         self.next()
         # parse arguments
         # TODO: implement named arguments
@@ -165,15 +168,46 @@ class Parser:
             if (self.current_token.type == TokenType.COMMA):
                 self.next()
             args.append(self.expression())
-        assert self.current_token.type == TokenType.RIGHT_PAREN
+        assert self.current_token.type == TokenType.RIGHT_PAREN, "Expected ')'"
         self.next()
         return FunctionCallExpression(name, args)
 
 
+    def expressionStatement(self) -> Statement:
+        return ExpressionStatement(self.expression())
+
+    def assignmentStatement(self) -> Statement:
+        if self.current_token.type != TokenType.KEYWORD:
+            assert False
+        if self.current_token.image != "let":
+            assert False
+        self.next()
+        if self.current_token.type != TokenType.IDENTIFIER_LITERAL:
+            assert False
+        identifier = IdentifierExpression(self.current_token.image)
+        self.next()
+        assert self.current_token.type == TokenType.EQUALS
+        self.next()
+        value = self.expression()
+        return AssignmentStatement(identifier, value)
 
 
     def statement(self) -> Statement:
-        return Statement()
+        if self.current_token.type == TokenType.KEYWORD:
+            if self.current_token.image == "let":
+                return self.assignmentStatement()
+        return self.expressionStatement()
 
     def program(self) -> Program:
-        return Program([])
+        statements = []
+        while (not self.ended):
+            statements.append(self.statement())
+        return Program(statements)
+
+    def _tryParse(self, rule: Callable[[], RuleReturnType]) -> RuleReturnType | None:
+        start_pos = self.current
+        try:
+            return rule()
+        except AssertionError:
+            self.current = start_pos
+            return None
