@@ -1,5 +1,5 @@
 from smol.interpret import Interpreter
-from smol.tokenizer import Tokenizer
+from smol.tokenizer import TokenType, Tokenizer
 from smol.parser import AdditionExpression, AssignmentStatement, ExponentatiotnExpression, Expression, ExpressionStatement, FunctionCallExpression, IdentifierExpression, IntegerExpression, MultiplicationExpression, NegationExpression, Parser, Program, Statement
 from pprint import pprint
 
@@ -14,6 +14,8 @@ def statement(stmt: Statement) -> str:
             return stringify(expression)
     raise Exception(f"Unexpected statement: {stmt}")
 
+
+# TODO: Implement comparisons
 def stringify(expression: Expression) -> str:
     match expression:
         case IdentifierExpression(value):
@@ -33,12 +35,16 @@ def stringify(expression: Expression) -> str:
     raise Exception(f"Unexpected expression: {expression}")
 
 if __name__ == "__main__":
-    tokens = Tokenizer("""let x = 2 * 1
-    print(x)""").tokenize()
+    print("/ᐠ｡ꞈ｡ᐟ\\")
+    print("Tokenizing")
+    tokens = Tokenizer("""
+    print(x != 0)""").tokenize()
     # pprint(tokens)
+    print("Parsing")
     parser = Parser(tokens)
     expr = parser.program()
     #pprint(expr)
     #print(program(expr))
+    print("Interpreting")
     interpreter = Interpreter(expr)
     interpreter.run()

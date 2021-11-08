@@ -15,6 +15,20 @@ class IntegerExpression(Expression):
 class IdentifierExpression(Expression):
     name: str
     
+
+@dataclass
+class EqualityExpression(Expression):
+    left: Expression
+    sign: Literal['=', '!=']
+    right: Expression
+
+@dataclass
+class ComparisonExpression(Expression):
+    left: Expression
+    sign: Literal['<', '>', '<=', '>=']
+    right: Expression
+
+
 @dataclass
 class AdditionExpression(Expression):
     left: Expression
@@ -88,7 +102,26 @@ class Parser:
         self.current += 1
 
     def expression(self) -> Expression:
-        return self.addition()
+        return self.equality()
+
+    def equality(self) -> Expression:
+        lhs = self.comparison()
+        while (not self.ended and self.current_token.match(TokenType.EQUALS, TokenType.NOT_EQUALS)):
+            assert self.current_token.image == "=" or self.current_token.image == "!="
+            sign: Literal["=", "!="] = self.current_token.image
+            self.next()
+            lhs = EqualityExpression(lhs, sign, self.comparison())
+        return lhs
+
+
+    def comparison(self) -> Expression:
+        lhs = self.addition()
+        while (not self.ended and self.current_token.match(TokenType.SMALLER_THAN, TokenType.GREATER_THAN, TokenType.SMALLER_OR_EQUAL_THAN, TokenType.GREATER_OR_EQUAL_THAN)):
+            assert self.current_token.image == "<" or self.current_token.image == ">" or self.current_token.image == "<=" or self.current_token.image == ">="
+            sign: Literal["<", ">", "<=", ">="] = self.current_token.image
+            self.next()
+            lhs = ComparisonExpression(lhs, sign, self.addition())
+        return lhs
 
     def addition(self) -> Expression:
         lhs = self.multiplication()

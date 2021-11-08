@@ -1,7 +1,7 @@
 from typing import Any
 from smol.parser import AdditionExpression, AssignmentStatement, ExponentatiotnExpression, Expression, ExpressionStatement, FunctionCallExpression, IdentifierExpression, IntegerExpression, MultiplicationExpression, NegationExpression, Program, Statement
 
-
+# TODO: Implement comparisons
 class Interpreter:
     program: Program
     state: dict[str, Any] = {
