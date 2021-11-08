@@ -6,26 +6,26 @@ from webbrowser import get
 
 class TokenType(Enum):
     # Single-character tokens and operators
-    LEFT_PAREN = auto()
-    RIGHT_PAREN = auto()
-    LEFT_BRACE = auto()
-    RIGHT_BRACE = auto()
-    COMMA = auto()
-    DOT = auto()
-    PLUS = auto()
-    MINUS = auto()
-    SLASH = auto()
-    STAR = auto()
-    CARET = auto()
-    SEMICOLON = auto()
+    LEFT_PAREN = "("
+    RIGHT_PAREN = ")"
+    LEFT_BRACE = "{"
+    RIGHT_BRACE = "}"
+    COMMA = ","
+    DOT = "."
+    PLUS = "+"
+    MINUS = "-"
+    SLASH = "/"
+    STAR = "*"
+    CARET = "^"
+    SEMICOLON = ";"
 
-    SMALLER_THAN = auto()
-    GREATER_THAN = auto()
-    EQUALS = auto()
+    SMALLER_THAN = "<"
+    GREATER_THAN = ">"
+    EQUALS = "="
     # Two or more character tokens and operators
-    NOT_EQUALS = auto()
-    SMALLER_OR_EQUAL_THAN = auto()
-    GREATER_OR_EQUAL_THAN = auto()
+    NOT_EQUALS = "!="
+    SMALLER_OR_EQUAL_THAN = "<="
+    GREATER_OR_EQUAL_THAN = ">="
     # Identifier tokens
     IDENTIFIER = auto()
     # Literal tokens
@@ -53,24 +53,6 @@ class Token:
         return self.__str__()
 
 
-SINGLE_CHAR_TOKENS = {
-    "(": TokenType.LEFT_PAREN,
-    ")": TokenType.RIGHT_PAREN,
-    "{": TokenType.LEFT_BRACE,
-    "}": TokenType.RIGHT_BRACE,
-    ",": TokenType.COMMA,
-    ".": TokenType.DOT,
-    "+": TokenType.PLUS,
-    "-": TokenType.MINUS,
-    "/": TokenType.SLASH,
-    "*": TokenType.STAR,
-    "^": TokenType.CARET,
-    ";": TokenType.SEMICOLON,
-    "=": TokenType.EQUALS,
-    "<": TokenType.SMALLER_THAN,
-    ">": TokenType.GREATER_THAN,
-}
-
 KEYWORDS = ["if", "else", "let"]
 
 
@@ -88,6 +70,15 @@ class Tokenizer:
     @property
     def current_character(self) -> str:
         return self.source[self.current_source_idx]
+
+    @property
+    def peek(self) -> str | None:
+        """
+        Returns the next character without incrementing current_source_index
+        """
+        if self.ended:
+            return None
+        return self.source[self.current_source_idx + 1]
 
     def __init__(self, source: str):
         self.source = source
@@ -151,15 +142,44 @@ class Tokenizer:
             self.skip_whitespace()
             if self.ended:
                 break
-            if self.current_character in SINGLE_CHAR_TOKENS:
-                self._tokens.append(
-                    Token(
-                        SINGLE_CHAR_TOKENS[self.current_character],
-                        self.current_character,
-                        self.current_line,
-                        self.current_column,
+            # TODO: clean this up
+            if self.current_character in [
+                t.value for t in TokenType.__members__.values()
+            ] + ["!"]:
+                if self.current_character in [">", "<"]:
+                    if self.peek and self.peek == "=":
+                        self._tokens.append(
+                            Token(
+                                type=TokenType(self.current_character + self.peek),
+                                image=self.current_character + self.peek,
+                                line=self.current_line,
+                                column=self.current_column,
+                            )
+                        )
+                        self.current_source_idx += 1
+                        self.current_column += 1
+                elif self.current_character == "!":
+                    if self.peek and self.peek == "=":
+                        self._tokens.append(
+                            Token(
+                                type=TokenType.NOT_EQUALS,
+                                image="!=",
+                                line=self.current_line,
+                                column=self.current_column,
+                            )
+                        )
+                        self.current_source_idx += 1
+                        self.current_column += 1
+                else:
+                    self._tokens.append(
+                        Token(
+                            type=TokenType(self.current_character),
+                            image=self.current_character,
+                            line=self.current_line,
+                            column=self.current_column,
+                        )
                     )
-                )
+
                 self.current_source_idx += 1
                 self.current_column += 1
             elif self.current_character.isdigit():  # integer literal
@@ -167,5 +187,6 @@ class Tokenizer:
             elif self.current_character.isalpha():  # identifier literal
                 self._tokens.append(self.identifier_literal())
             else:
+                print(f"Unknown character {self.current_character}")
                 assert False, "other tokens not yet implemented"
         return self._tokens
