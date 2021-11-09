@@ -1,5 +1,12 @@
 from typing import Any
-from smol.parser import AdditionExpression, AssignmentStatement, ExponentatiotnExpression, Expression, ExpressionStatement, FunctionCallExpression, IdentifierExpression, IntegerExpression, MultiplicationExpression, NegationExpression, Program, Statement
+
+from smol.parser import (AdditionExpression, AssignmentStatement,
+                         ExponentatiotnExpression, Expression,
+                         ExpressionStatement, FunctionCallExpression,
+                         IdentifierExpression, IntegerExpression,
+                         MultiplicationExpression, NegationExpression, Program,
+                         Statement)
+
 
 # TODO: Implement comparisons
 class Interpreter:
@@ -28,22 +35,25 @@ class Interpreter:
                 else:
                     return self.evaluate(left) - self.evaluate(right)
             case NegationExpression(expression):
-                return -self.evaluate(expression)
+                value = self.evaluate(expression)
+                assert value is int
+                return value
             case FunctionCallExpression(ident, args):
                 return self.state[ident.name](*[self.evaluate(arg) for arg in args])
             case IdentifierExpression(name):
                 return self.state[name]
-            
 
-    def execute(self, statement: Statement, state: dict[str, Any]):
+    def execute(self, statement: Statement, state: dict[str, Any]) -> Any:
         match statement:
             case AssignmentStatement(ident, expression):
                 state[ident.name] = self.evaluate(expression)
+                return state[ident.name]
             case ExpressionStatement(expression):
-                self.evaluate(expression)
+                return self.evaluate(expression)
 
-
-    def run(self):
+    def run(self) -> Any:
+        # Execute all statements and return last
+        last: Any = None
         for statement in self.program.statements:
-            self.execute(statement, self.state)
-        
+            last = self.execute(statement, self.state)
+        return last

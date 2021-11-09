@@ -1,26 +1,32 @@
 from dataclasses import dataclass
-from typing import Callable, Literal, TypeVar
-from smol.tokenizer import Token, TokenType
 from textwrap import dedent
+from typing import Callable, Literal, TypeVar
+
+from smol.interpret import Interpreter
+from smol.tokenizer import Token, TokenType
+
 
 @dataclass
 class Expression:
     pass
 
+
 @dataclass
 class IntegerExpression(Expression):
     value: int
 
+
 @dataclass
 class IdentifierExpression(Expression):
     name: str
-    
+
 
 @dataclass
 class EqualityExpression(Expression):
     left: Expression
     sign: Literal['=', '!=']
     right: Expression
+
 
 @dataclass
 class ComparisonExpression(Expression):
@@ -35,11 +41,13 @@ class AdditionExpression(Expression):
     sign: Literal["+"] | Literal["-"]
     right: Expression
 
+
 @dataclass
 class MultiplicationExpression(Expression):
     left: Expression
     sign: Literal["*"] | Literal["/"]
     right: Expression
+
 
 @dataclass
 class ExponentatiotnExpression(Expression):
@@ -47,22 +55,27 @@ class ExponentatiotnExpression(Expression):
     sign: Literal["^"]
     right: Expression
 
+
 @dataclass
 class NegationExpression(Expression):
     value: Expression
+
 
 @dataclass
 class FunctionCallExpression(Expression):
     name: IdentifierExpression
     args: list[Expression]
 
+
 @dataclass
 class Statement:
     pass
 
+
 @dataclass
 class ExpressionStatement(Statement):
     value: Expression
+
 
 @dataclass
 class AssignmentStatement(Statement):
@@ -74,7 +87,14 @@ class AssignmentStatement(Statement):
 class Program:
     statements: list[Statement]
 
+    def execute(self):
+
+        interpreter = Interpreter(self)
+        return interpreter.run()
+
+
 RuleReturnType = TypeVar("RuleReturnType", Expression, Program, Statement)
+
 
 class Parser:
     """
@@ -113,11 +133,18 @@ class Parser:
             lhs = EqualityExpression(lhs, sign, self.comparison())
         return lhs
 
-
     def comparison(self) -> Expression:
         lhs = self.addition()
-        while (not self.ended and self.current_token.match(TokenType.SMALLER_THAN, TokenType.GREATER_THAN, TokenType.SMALLER_OR_EQUAL_THAN, TokenType.GREATER_OR_EQUAL_THAN)):
-            assert self.current_token.image == "<" or self.current_token.image == ">" or self.current_token.image == "<=" or self.current_token.image == ">="
+        while (not self.ended and self.current_token.match(
+            TokenType.SMALLER_THAN,
+            TokenType.GREATER_THAN,
+            TokenType.SMALLER_OR_EQUAL_THAN,
+            TokenType.GREATER_OR_EQUAL_THAN)
+        ):
+            assert (self.current_token.image == "<"
+                    or self.current_token.image == ">"
+                    or self.current_token.image == "<="
+                    or self.current_token.image == ">=")
             sign: Literal["<", ">", "<=", ">="] = self.current_token.image
             self.next()
             lhs = ComparisonExpression(lhs, sign, self.addition())
@@ -145,9 +172,9 @@ class Parser:
         lhs = self.negation()
         while (not self.ended and self.current_token.type == TokenType.CARET):
             self.next()
-            lhs = ExponentatiotnExpression(lhs, "^", self.exponentiation()) # it just works?
+            lhs = ExponentatiotnExpression(
+                lhs, "^", self.exponentiation())  # it just works?
         return lhs
-
 
     def negation(self) -> Expression:
         if self.current_token.type == TokenType.MINUS:
@@ -155,18 +182,17 @@ class Parser:
             return NegationExpression(self.atomic())
         return self.atomic()
 
-
     def atomic(self) -> Expression:
         expr: Expression
         match self.current_token:
             case Token(TokenType.INTEGER_LITERAL):
-                expr =  IntegerExpression(int(self.current_token.image))
+                expr = IntegerExpression(int(self.current_token.image))
             case Token(TokenType.LEFT_PAREN):
-                expr =  self.parenthesized_expression()
+                expr = self.parenthesized_expression()
             case Token(TokenType.IDENTIFIER_LITERAL):
                 if (self.peek_next and self.peek_next.type == TokenType.LEFT_PAREN):
                     expr = self.function_call()
-                else: 
+                else:
                     expr = IdentifierExpression(self.current_token.image)
             case _:
                 # TODO: improve error reporting
@@ -188,7 +214,7 @@ class Parser:
         assert self.current_token.type == TokenType.RIGHT_PAREN, "Expected ')'"
         self.next()
         return expr
-    
+
     def function_call(self) -> Expression:
         name = IdentifierExpression(self.current_token.image)
         self.next()
@@ -198,18 +224,17 @@ class Parser:
         # TODO: implement named arguments
         args = []
         while (not self.ended and self.current_token.type != TokenType.RIGHT_PAREN):
-            if (self.current_token.type == TokenType.COMMA):
+            if self.current_token.type == TokenType.COMMA:
                 self.next()
             args.append(self.expression())
         assert self.current_token.type == TokenType.RIGHT_PAREN, "Expected ')'"
         self.next()
         return FunctionCallExpression(name, args)
 
-
-    def expressionStatement(self) -> Statement:
+    def expression_statement(self) -> Statement:
         return ExpressionStatement(self.expression())
 
-    def assignmentStatement(self) -> Statement:
+    def assignment_statement(self) -> Statement:
         if self.current_token.type != TokenType.KEYWORD:
             assert False
         if self.current_token.image != "let":
@@ -224,20 +249,19 @@ class Parser:
         value = self.expression()
         return AssignmentStatement(identifier, value)
 
-
     def statement(self) -> Statement:
         if self.current_token.type == TokenType.KEYWORD:
             if self.current_token.image == "let":
-                return self.assignmentStatement()
-        return self.expressionStatement()
+                return self.assignment_statement()
+        return self.expression_statement()
 
     def program(self) -> Program:
         statements = []
-        while (not self.ended):
+        while not self.ended:
             statements.append(self.statement())
         return Program(statements)
 
-    def _tryParse(self, rule: Callable[[], RuleReturnType]) -> RuleReturnType | None:
+    def _try_parse(self, rule: Callable[[], RuleReturnType]) -> RuleReturnType | None:
         start_pos = self.current
         try:
             return rule()

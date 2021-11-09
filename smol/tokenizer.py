@@ -1,7 +1,5 @@
 from dataclasses import dataclass
-from email.mime import image
 from enum import Enum, auto
-from webbrowser import get
 
 
 class TokenType(Enum):
@@ -47,7 +45,9 @@ class Token:
         return self.type in types
 
     def __str__(self):
-        return f"Token(type=<{self.type.name}>, image=`{self.image}`, position=[{self.line}:{self.column}])"
+        return (f"Token(type=<{self.type.name}>"
+                f", image=`{self.image}`"
+                f", position=[{self.line}:{self.column}])")
 
     def __repr__(self):
         return self.__str__()
@@ -85,7 +85,7 @@ class Tokenizer:
 
     def skip_whitespace(self):
         """
-        Skips whitespaces in source incrementing current_source_index, current_column and current_line if needed
+        Skips whitespaces in source
         """
         while not self.ended and self.current_character.isspace():
             if self.current_character == "\n":
@@ -105,7 +105,7 @@ class Tokenizer:
             self.current_column += 1
         return Token(
             type=TokenType.INTEGER_LITERAL,
-            image=self.source[start : self.current_source_idx],
+            image=self.source[start: self.current_source_idx],
             line=self.current_line,
             column=self.current_column,
         )
@@ -119,7 +119,7 @@ class Tokenizer:
             self.current_source_idx += 1
             self.current_column += 1
 
-        image = self.source[start : self.current_source_idx]
+        image = self.source[start: self.current_source_idx]
 
         return Token(
             type=TokenType.KEYWORD
@@ -150,7 +150,8 @@ class Tokenizer:
                     if self.peek and self.peek == "=":
                         self._tokens.append(
                             Token(
-                                type=TokenType(self.current_character + self.peek),
+                                type=TokenType(
+                                    self.current_character + self.peek),
                                 image=self.current_character + self.peek,
                                 line=self.current_line,
                                 column=self.current_column,
