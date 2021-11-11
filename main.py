@@ -2,14 +2,14 @@ from io import TextIOWrapper
 from pprint import pprint
 
 from smol.interpret import Interpreter
-from smol.parser import (AdditionExpression, AssignmentStatement,
-                         BlockExpression, ComparisonExpression,
-                         EqualityExpression, ExponentatiotnExpression,
-                         Expression, ExpressionStatement,
+from smol.parser import (AdditionExpression, ArrayExpression, AssignmentStatement,
+                         BlockExpression, BreakExpression, ComparisonExpression, ContinueExpression,
+                         EqualityExpression, ExponentiationExpression,
+                         Expression, ExpressionStatement, ForStatement,
                          FunctionCallExpression, IdentifierExpression,
                          IfExpression, IntegerExpression,
                          MultiplicationExpression, NegationExpression, Parser,
-                         Program, Statement)
+                         Program, Statement, StringExpression)
 from smol.tokenizer import Tokenizer
 
 
@@ -23,6 +23,9 @@ def statement(stmt: Statement, indent: int = 0) -> str:
             return f"{stringify(name, indent)} = {stringify(value)}"
         case ExpressionStatement(expression):
             return stringify(expression, indent)
+        case ForStatement(ident, expr, body):
+            return f"for {stringify(ident)} in {stringify(expr)} do \n{stringify(body, indent + 1)}\nend"
+
     raise Exception(f"Unexpected statement: {stmt}")
 
 
@@ -33,13 +36,15 @@ def stringify(expression: Expression, indent: int = 0) -> str:
             return "\t" * indent + value
         case IntegerExpression(value):
             return "\t" * indent + str(value)
+        case StringExpression(value):
+            return "\t" * indent + f'"{value}"'
         case AdditionExpression(lhs, sign, rhs):
             return "\t" * indent + f"({stringify(lhs)} {sign} {stringify(rhs)})"
         case MultiplicationExpression(lhs, sign, rhs):
             return "\t" * indent + f"({stringify(lhs)} {sign} {stringify(rhs)})"
         case NegationExpression(value):
             return "\t" * indent + f"(-{stringify(value)})"
-        case ExponentatiotnExpression(lhs, sign, rhs):
+        case ExponentiationExpression(lhs, sign, rhs):
             return "\t" * indent + f"({stringify(lhs)} {sign} {stringify(rhs)})"
         case FunctionCallExpression(name, args):
             return "\t" * indent + f"{stringify(name)}({', '.join(stringify(arg) for arg in args)})"
@@ -54,6 +59,12 @@ def stringify(expression: Expression, indent: int = 0) -> str:
                 f"elif {stringify(elif_[0])}:\n{stringify(elif_[1], indent + 1)}" for elif_ in elifs)
             else_branch = f"else:\n{stringify(else_body, indent + 1)}" if else_body else ''
             return f"{main_branch}\n{elif_branches}\n{else_branch}"
+        case ArrayExpression(values):
+            return f"[{', '.join(stringify(value) for value in values)}]"
+        case BreakExpression():
+            return "\t" * indent + "break"
+        case ContinueExpression():
+            return "\t" * indent + "continue"
         case BlockExpression(statements):
             stmts = ('\n').join(statement(stmt, indent + 1)
                                 for stmt in statements)
@@ -101,7 +112,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description='Interpreter for the smol language')
     parser.add_argument("run_type", nargs="?", choices=[
-                        'repl', "r", 'interpret', "i", 'compile', "c`"], help="Run type")
+                        'repl', "r", 'interpret', "i", 'compile', "c"], help="Run type")
     parser.add_argument('file', nargs='?',
                         help='File to interpret', type=open)
     parser.add_argument("--debug", "-d", action="store_true")
