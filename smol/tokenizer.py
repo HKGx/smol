@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from enum import Enum, auto
-from functools import cached_property, lru_cache
+from functools import lru_cache
 
 
 class TokenType(Enum):
@@ -89,6 +89,13 @@ class Tokenizer:
             return None
         return self.source[self.current_source_idx + 1]
 
+    def increment(self):
+        """
+        Increments current_source_idx and current_column
+        """
+        self.current_source_idx += 1
+        self.current_column += 1
+
     def __init__(self, source: str):
         self.source = source
 
@@ -110,8 +117,7 @@ class Tokenizer:
         """
         start = self.current_source_idx
         while not self.ended and self.current_character.isdigit():
-            self.current_source_idx += 1
-            self.current_column += 1
+            self.increment()
         return Token(
             type=TokenType.INTEGER_LITERAL,
             image=self.source[start: self.current_source_idx],
@@ -125,9 +131,7 @@ class Tokenizer:
         """
         start = self.current_source_idx
         while not self.ended and (self.current_character.isalnum() or self.current_character == "_"):
-            self.current_source_idx += 1
-            self.current_column += 1
-
+            self.increment()
         image = self.source[start: self.current_source_idx]
 
         return Token(
@@ -163,8 +167,7 @@ class Tokenizer:
                                 column=self.current_column,
                             )
                         )
-                        self.current_source_idx += 1
-                        self.current_column += 1
+                        self.increment()
                     case _:
                         self._tokens.append(
                             Token(
@@ -174,9 +177,7 @@ class Tokenizer:
                                 column=self.current_column,
                             )
                         )
-
-                self.current_source_idx += 1
-                self.current_column += 1
+                self.increment()
             elif self.current_character.isdigit():  # integer literal
                 self._tokens.append(self.integer_literal())
             elif self.current_character.isalpha():  # identifier literal
