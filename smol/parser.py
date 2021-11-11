@@ -279,6 +279,7 @@ class Parser:
         assert self.current_token.type == TokenType.LEFT_PAREN, "Expected '('"
         self.next()
         expr = self.expression()
+        assert not self.ended, "Expected ')' but found 'EOF'"
         assert self.current_token.type == TokenType.RIGHT_PAREN, "Expected ')'"
         self.next()
         return expr
@@ -286,6 +287,7 @@ class Parser:
     def function_call(self) -> Expression:
         name = IdentifierExpression(self.current_token.image)
         self.next()
+        assert not self.ended, "Expected `(` but found `EOF`"
         assert self.current_token.type == TokenType.LEFT_PAREN, "Expected '('"
         self.next()
         # parse arguments
