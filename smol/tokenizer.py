@@ -15,6 +15,7 @@ class TokenType(Enum):
     SLASH = "/"
     STAR = "*"
     CARET = "^"
+    COLON = ":"
     SEMICOLON = ";"
 
     SMALLER_THAN = "<"
@@ -53,7 +54,7 @@ class Token:
         return self.__str__()
 
 
-KEYWORDS = ["if", "else", "let"]
+KEYWORDS = ["if", "else", "let", "do", "end"]
 
 
 class Tokenizer:
@@ -115,7 +116,7 @@ class Tokenizer:
         Parse identifier literal and return Token
         """
         start = self.current_source_idx
-        while not self.ended and self.current_character.isalnum():
+        while not self.ended and (self.current_character.isalnum() or self.current_character == "_"):
             self.current_source_idx += 1
             self.current_column += 1
 
@@ -146,19 +147,18 @@ class Tokenizer:
             if self.current_character in [
                 t.value for t in TokenType.__members__.values()
             ] + ["!"]:
-                if self.current_character in [">", "<"]:
-                    if self.peek and self.peek == "=":
-                        self._tokens.append(
-                            Token(
-                                type=TokenType(
-                                    self.current_character + self.peek),
-                                image=self.current_character + self.peek,
-                                line=self.current_line,
-                                column=self.current_column,
-                            )
+                if self.current_character in [">", "<"] and (self.peek and self.peek == "="):
+                    self._tokens.append(
+                        Token(
+                            type=TokenType(
+                                self.current_character + self.peek),
+                            image=self.current_character + self.peek,
+                            line=self.current_line,
+                            column=self.current_column,
                         )
-                        self.current_source_idx += 1
-                        self.current_column += 1
+                    )
+                    self.current_source_idx += 1
+                    self.current_column += 1
                 elif self.current_character == "!":
                     if self.peek and self.peek == "=":
                         self._tokens.append(

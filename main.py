@@ -1,9 +1,13 @@
 from io import TextIOWrapper
 from pprint import pprint
+
+from smol.interpret import Interpreter
 from smol.parser import (AdditionExpression, AssignmentStatement,
-                         ExponentatiotnExpression, Expression,
-                         ExpressionStatement, FunctionCallExpression,
-                         IdentifierExpression, IntegerExpression,
+                         BlockExpression, ComparisonExpression,
+                         EqualityExpression, ExponentatiotnExpression,
+                         Expression, ExpressionStatement,
+                         FunctionCallExpression, IdentifierExpression,
+                         IfExpression, IntegerExpression,
                          MultiplicationExpression, NegationExpression, Parser,
                          Program, Statement)
 from smol.tokenizer import Tokenizer
@@ -13,32 +17,48 @@ def program(prog: Program) -> str:
     return '\n'.join(statement(stmt) for stmt in prog.statements)
 
 
-def statement(stmt: Statement) -> str:
+def statement(stmt: Statement, indent: int = 0) -> str:
     match stmt:
         case AssignmentStatement(name, value):
-            return f"{stringify(name)} = {stringify(value)}"
+            return f"{stringify(name, indent)} = {stringify(value)}"
         case ExpressionStatement(expression):
-            return stringify(expression)
+            return stringify(expression, indent)
     raise Exception(f"Unexpected statement: {stmt}")
 
 
-# TODO: Implement comparisons
-def stringify(expression: Expression) -> str:
+def stringify(expression: Expression, indent: int = 0) -> str:
+    # TODO: improve intendation
     match expression:
         case IdentifierExpression(value):
-            return value
+            return "\t" * indent + value
         case IntegerExpression(value):
-            return str(value)
+            return "\t" * indent + str(value)
         case AdditionExpression(lhs, sign, rhs):
-            return f"({stringify(lhs)} {sign} {stringify(rhs)})"
+            return "\t" * indent + f"({stringify(lhs)} {sign} {stringify(rhs)})"
         case MultiplicationExpression(lhs, sign, rhs):
-            return f"({stringify(lhs)} {sign} {stringify(rhs)})"
+            return "\t" * indent + f"({stringify(lhs)} {sign} {stringify(rhs)})"
         case NegationExpression(value):
-            return f"(-{stringify(value)})"
+            return "\t" * indent + f"(-{stringify(value)})"
         case ExponentatiotnExpression(lhs, sign, rhs):
-            return f"({stringify(lhs)} {sign} {stringify(rhs)})"
+            return "\t" * indent + f"({stringify(lhs)} {sign} {stringify(rhs)})"
         case FunctionCallExpression(name, args):
-            return f"{stringify(name)}({', '.join(stringify(arg) for arg in args)})"
+            return "\t" * indent + f"{stringify(name)}({', '.join(stringify(arg) for arg in args)})"
+        case ComparisonExpression(left, sign, right):
+            return "\t" * indent + f"{stringify(left)} {sign} {stringify(right)}"
+        case EqualityExpression(left, sign, right):
+            return "\t" * indent + f"{stringify(left)} {sign} {stringify(right)}"
+        case IfExpression(condition, body, elifs, else_body):
+            main_branch = "\t" * indent + \
+                f"if {stringify(condition)}:\n{stringify(body, indent + 1)}"
+            elif_branches = ("\t" * indent + '\n').join(
+                f"elif {stringify(elif_[0])}:\n{stringify(elif_[1], indent + 1)}" for elif_ in elifs)
+            else_branch = f"else:\n{stringify(else_body, indent + 1)}" if else_body else ''
+            return f"{main_branch}\n{elif_branches}\n{else_branch}"
+        case BlockExpression(statements):
+            stmts = ('\n').join(statement(stmt, indent + 1)
+                                for stmt in statements)
+            return "\t" * indent + f"do\n{stmts}\n" + "\t" * indent + "end"
+
     raise Exception(f"Unexpected expression: {expression}")
 
 
@@ -50,21 +70,20 @@ def interpret_file(file: TextIOWrapper):
     tokens = Tokenizer(file.read()).tokenize()
     prog = Parser(tokens).program()
     print(program(prog))
-    print(prog.execute())
+    interpreter = Interpreter(prog)
+    print(interpreter.run())
 
 
 def repl():
     while True:
-        try:
-            line = input('> ')
-            if line == 'exit':
-                break
-            tokens = Tokenizer(line).tokenize()
-            prog = Parser(tokens).program()
-            print(program(prog))
-            print(prog.execute())
-        except Exception as exception:
-            print(exception)
+        line = input('> ')
+        if line == 'exit':
+            break
+        tokens = Tokenizer(line).tokenize()
+        prog = Parser(tokens).program()
+        print(program(prog))
+        interpreter = Interpreter(prog)
+        print(interpreter.run())
 
 
 if __name__ == "__main__":

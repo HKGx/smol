@@ -1,6 +1,7 @@
 from typing import Any
 
 from smol.parser import (AdditionExpression, AssignmentStatement,
+                         ComparisonExpression, EqualityExpression,
                          ExponentatiotnExpression, Expression,
                          ExpressionStatement, FunctionCallExpression,
                          IdentifierExpression, IntegerExpression,
@@ -8,7 +9,6 @@ from smol.parser import (AdditionExpression, AssignmentStatement,
                          Statement)
 
 
-# TODO: Implement comparisons
 class Interpreter:
     program: Program
     state: dict[str, Any] = {
@@ -19,6 +19,7 @@ class Interpreter:
         self.program = program
 
     def evaluate(self, expression: Expression) -> Any:
+        # TODO: Implement blocks and ifs
         match expression:
             case IntegerExpression(value):
                 return value
@@ -34,6 +35,23 @@ class Interpreter:
                     return self.evaluate(left) + self.evaluate(right)
                 else:
                     return self.evaluate(left) - self.evaluate(right)
+            case ComparisonExpression(left, sign, right):
+                lhs = self.evaluate(left)
+                rhs = self.evaluate(right)
+                comparison_map = {
+                    ">": "__gt__",
+                    ">=": "__ge__",
+                    "<": "__lt__",
+                    "<=": "__le__"
+                }
+                fun = getattr(lhs, comparison_map[sign])
+                return fun(rhs)
+
+            case EqualityExpression(left, sign, right):
+                if sign == "=":
+                    return self.evaluate(left) == self.evaluate(right)
+                return self.evaluate(left) != self.evaluate(right)
+
             case NegationExpression(expression):
                 value = self.evaluate(expression)
                 assert value is int

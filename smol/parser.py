@@ -1,8 +1,8 @@
+from ast import keyword
 from dataclasses import dataclass
 from textwrap import dedent
 from typing import Callable, Literal, TypeVar
 
-from smol.interpret import Interpreter
 from smol.tokenizer import Token, TokenType
 
 
@@ -24,14 +24,14 @@ class IdentifierExpression(Expression):
 @dataclass
 class EqualityExpression(Expression):
     left: Expression
-    sign: Literal['=', '!=']
+    sign: Literal['='] | Literal['!=']
     right: Expression
 
 
 @dataclass
 class ComparisonExpression(Expression):
     left: Expression
-    sign: Literal['<', '>', '<=', '>=']
+    sign: Literal['<'] | Literal[">"] | Literal[">="] | Literal["<="]
     right: Expression
 
 
@@ -68,6 +68,19 @@ class FunctionCallExpression(Expression):
 
 
 @dataclass
+class IfExpression(Expression):
+    condition: Expression
+    body: Expression
+    else_ifs: list[tuple[Expression, Expression]]
+    else_body: Expression | None
+
+
+@dataclass
+class BlockExpression(Expression):
+    body: list["Statement"]
+
+
+@dataclass
 class Statement:
     pass
 
@@ -86,11 +99,6 @@ class AssignmentStatement(Statement):
 @dataclass
 class Program:
     statements: list[Statement]
-
-    def execute(self):
-
-        interpreter = Interpreter(self)
-        return interpreter.run()
 
 
 RuleReturnType = TypeVar("RuleReturnType", Expression, Program, Statement)
@@ -185,6 +193,10 @@ class Parser:
     def atomic(self) -> Expression:
         expr: Expression
         match self.current_token:
+            case Token(TokenType.KEYWORD, "do"):
+                expr = self.do_block_expression()
+            case Token(TokenType.KEYWORD, "if"):
+                expr = self.if_expression()
             case Token(TokenType.INTEGER_LITERAL):
                 expr = IntegerExpression(int(self.current_token.image))
             case Token(TokenType.LEFT_PAREN):
@@ -206,6 +218,67 @@ class Parser:
         self.next()
         assert expr is not None, "Technically unreachable"
         return expr
+
+    def do_block_expression(self) -> Expression:
+        assert self.current_token.type == TokenType.KEYWORD
+        assert self.current_token.image == "do"
+        self.next()
+        statements = []
+        while (not self.ended
+               and not self.current_token.type == TokenType.KEYWORD
+               and not self.current_token.image == "end"):
+            statements.append(self.statement())
+        self.next()
+        return BlockExpression(statements)
+
+    def if_expression(self) -> Expression:
+        assert self.current_token.type == TokenType.KEYWORD
+        assert self.current_token.image == "if"
+        self.next()
+        assert not self.ended, "Expected expression after `if` but found `EOF`"
+        condition = self.expression()
+        assert not self.ended, "Expected `:` or `do` but found `EOF`"
+        if self.current_token.type == TokenType.COLON:
+            self.next()
+            assert not self.ended, "Expected expression after `:` but found `EOF`"
+            body = self.expression()
+        elif self.current_token.type == TokenType.KEYWORD:
+            assert self.current_token.image == "do"
+            body = self.do_block_expression()
+        else:
+            assert False, "Expected `:` or `do`"
+        elifs: list[tuple[Expression, Expression]] = []
+        while(not self.ended and self.current_token.type == TokenType.KEYWORD and self.current_token.image == "else"):
+            self.next()
+            if self.current_token.type == TokenType.KEYWORD:
+                assert self.current_token.image == "if", "Expected `if`"
+                self.next()
+                else_condition = self.expression()
+                if self.current_token.type == TokenType.COLON:
+                    self.next()
+                    else_body = self.expression()
+                elif self.current_token.type == TokenType.KEYWORD:
+                    assert self.current_token.image == "do"
+                    else_body = self.do_block_expression()
+                else:
+                    assert False, "Expected `:` or `do`"
+                elifs.append((else_condition, else_body))
+            else:
+                assert False, "Expected `if`"
+        else_body: Expression | None = None
+        if self.ended:
+            return IfExpression(condition, body, elifs, else_body)
+        if self.current_token.type == TokenType.KEYWORD and self.current_token.image == "else":
+            self.next()
+            if self.current_token.type == TokenType.COLON:
+                self.next()
+                else_body = self.expression()
+            elif self.current_token.type == TokenType.KEYWORD:
+                assert self.current_token.image == "do"
+                else_body = self.do_block_expression()
+            else:
+                assert False, "Expected `:` or `do`"
+        return IfExpression(condition, body, elifs, else_body)
 
     def parenthesized_expression(self) -> Expression:
         assert self.current_token.type == TokenType.LEFT_PAREN, "Expected '('"
