@@ -45,7 +45,10 @@ class Scope(dict[str, Any]):
             self[key] = value
             return True
         if self.parent is not None:
-            return self.parent.rec_set(key, value)
+            if self.parent.rec_contains(key):
+                return self.parent.rec_set(key, value)
+            self[key] = value
+            return True
         return False
 
     def spawn_child(self):
@@ -72,6 +75,7 @@ class Interpreter:
         self.program = program
 
     def evaluate(self, expression: Expression, scope: Scope = None) -> RETURN_TYPE:
+        # TODO: assist runtime type checking with compile-time type checking
         if scope is None:
             scope = self.scope
         match expression:
