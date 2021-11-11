@@ -97,6 +97,12 @@ class AssignmentStatement(Statement):
 
 
 @dataclass
+class ForStatement(Statement):
+    name: IdentifierExpression
+    iter: Expression
+
+
+@dataclass
 class Program:
     statements: list[Statement]
 
@@ -231,13 +237,7 @@ class Parser:
         self.next()
         return BlockExpression(statements)
 
-    def if_expression(self) -> Expression:
-        assert self.current_token.type == TokenType.KEYWORD
-        assert self.current_token.image == "if"
-        self.next()
-        assert not self.ended, "Expected expression after `if` but found `EOF`"
-        condition = self.expression()
-        assert not self.ended, "Expected `:` or `do` but found `EOF`"
+    def if_body(self) -> Expression:
         if self.current_token.type == TokenType.COLON:
             self.next()
             assert not self.ended, "Expected expression after `:` but found `EOF`"
@@ -247,22 +247,31 @@ class Parser:
             body = self.do_block_expression()
         else:
             assert False, "Expected `:` or `do`"
+        return body
+
+    def if_expression(self) -> Expression:
+        assert self.current_token.type == TokenType.KEYWORD
+        assert self.current_token.image == "if"
+        self.next()
+        assert not self.ended, "Expected expression after `if` but found `EOF`"
+        condition = self.expression()
+        assert not self.ended, "Expected `:` or `do` but found `EOF`"
+        body = self.if_body()
         elifs: list[tuple[Expression, Expression]] = []
-        while(not self.ended and self.current_token.type == TokenType.KEYWORD and self.current_token.image == "else"):
+        # TODO: this can be simplified based on match statement
+        while(not self.ended
+              and self.current_token.type == TokenType.KEYWORD
+              and self.current_token.image == "else"
+              and self.peek_next
+              and self.peek_next.type == TokenType.KEYWORD
+              and self.peek_next.image == "if"):
             self.next()
             if self.current_token.type == TokenType.KEYWORD:
                 assert self.current_token.image == "if", "Expected `if`"
                 self.next()
                 else_condition = self.expression()
-                if self.current_token.type == TokenType.COLON:
-                    self.next()
-                    else_body = self.expression()
-                elif self.current_token.type == TokenType.KEYWORD:
-                    assert self.current_token.image == "do"
-                    else_body = self.do_block_expression()
-                else:
-                    assert False, "Expected `:` or `do`"
-                elifs.append((else_condition, else_body))
+                else_if_body = self.if_body()
+                elifs.append((else_condition, else_if_body))
             else:
                 assert False, "Expected `if`"
         else_body: Expression | None = None
@@ -270,14 +279,7 @@ class Parser:
             return IfExpression(condition, body, elifs, else_body)
         if self.current_token.type == TokenType.KEYWORD and self.current_token.image == "else":
             self.next()
-            if self.current_token.type == TokenType.COLON:
-                self.next()
-                else_body = self.expression()
-            elif self.current_token.type == TokenType.KEYWORD:
-                assert self.current_token.image == "do"
-                else_body = self.do_block_expression()
-            else:
-                assert False, "Expected `:` or `do`"
+            else_body = self.if_body()
         return IfExpression(condition, body, elifs, else_body)
 
     def parenthesized_expression(self) -> Expression:
