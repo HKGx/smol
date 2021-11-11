@@ -66,7 +66,7 @@ class Token:
         return self.__str__()
 
 
-KEYWORDS = ["if", "else", "let", "do", "end", "for", "in"]
+KEYWORDS = {"if", "else", "let", "do", "end", "for", "in", "break", "continue"}
 
 
 class Tokenizer:
@@ -110,7 +110,7 @@ class Tokenizer:
         while not self.ended and self.current_character.isspace():
             if self.current_character == "\n":
                 self.current_line += 1
-                self.current_column = 0
+                self.current_column = 1
             else:
                 self.current_column += 1
             self.current_source_idx += 1
@@ -122,11 +122,45 @@ class Tokenizer:
         start = self.current_source_idx
         while not self.ended and self.current_character.isdigit():
             self.increment()
+        image = self.source[start: self.current_source_idx]
         return Token(
             type=TokenType.INTEGER_LITERAL,
             image=self.source[start: self.current_source_idx],
             line=self.current_line,
-            column=self.current_column,
+            column=self.current_column - len(image),
+        )
+
+    def string_literal(self) -> Token:
+        """
+        Parse string literal and return Token
+        """
+        # not sure about the implementation, but it seems to work
+        assert self.current_character == '"'
+        self.increment()
+        start = self.current_source_idx
+        while not self.ended:
+            match self.current_character:
+                case '"':
+                    break
+                case "\n":
+                    self.current_line += 1
+                    self.current_column = 0
+                    self.current_source_idx += 1
+                    continue
+                case "\\":
+                    self.increment()
+                    self.increment()
+                    continue
+            self.increment()
+        assert not self.ended, "Unterminated string literal"
+        assert self.current_character == '"', "Unterminated string literal"
+        image = self.source[start: self.current_source_idx]
+        self.increment()
+        return Token(
+            type=TokenType.STRING_LITERAL,
+            image=image,
+            line=self.current_line,
+            column=self.current_column - len(image),
         )
 
     def identifier_literal(self) -> Token:
@@ -144,7 +178,7 @@ class Tokenizer:
             else TokenType.IDENTIFIER_LITERAL,
             image=image,
             line=self.current_line,
-            column=self.current_column,
+            column=self.current_column - len(image),
         )
 
     def tokenize(self) -> list[Token]:
@@ -159,7 +193,9 @@ class Tokenizer:
             self.skip_whitespace()
             if self.ended:
                 break
-            if self.current_character in TokenType.first_characters():
+            if self.current_character == '"':
+                self._tokens.append(self.string_literal())
+            elif self.current_character in TokenType.first_characters():
                 match (self.current_character, self.peek):
                     case (">" | "<" | "!", "="):
                         self._tokens.append(
@@ -168,7 +204,7 @@ class Tokenizer:
                                     self.current_character + self.peek),
                                 image=self.current_character + self.peek,
                                 line=self.current_line,
-                                column=self.current_column,
+                                column=self.current_column - 2,
                             )
                         )
                         self.increment()
@@ -178,13 +214,13 @@ class Tokenizer:
                                 type=TokenType(self.current_character),
                                 image=self.current_character,
                                 line=self.current_line,
-                                column=self.current_column,
+                                column=self.current_column - 1,
                             )
                         )
                 self.increment()
             elif self.current_character.isdigit():  # integer literal
                 self._tokens.append(self.integer_literal())
-            elif self.current_character.isalpha():  # identifier literal
+            elif self.current_character.isalpha() or self.current_character in ("_"):  # identifier literal
                 self._tokens.append(self.identifier_literal())
             else:
                 print(f"Unknown character {self.current_character}")
