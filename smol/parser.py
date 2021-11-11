@@ -318,7 +318,6 @@ class Parser:
                     return IfExpression(condition, body, elifs, else_body)
                 case _:
                     break
-        print(self.current_token)
         return IfExpression(condition, body, elifs, None)
 
     def parenthesized_expression(self) -> Expression:
