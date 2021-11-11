@@ -89,7 +89,7 @@ class Tokenizer:
         """
         Returns the next character without incrementing current_source_index
         """
-        if self.ended:
+        if self.current_source_idx + 1 >= len(self.source):
             return None
         return self.source[self.current_source_idx + 1]
 
