@@ -9,6 +9,10 @@ class TokenType(Enum):
     RIGHT_PAREN = ")"
     LEFT_BRACE = "{"
     RIGHT_BRACE = "}"
+    LEFT_BRACKET = "["
+    RIGHT_BRACKET = "]"
+    LEFT_POINTY_BRACKET = "<"
+    RIGHT_POINTY_BRACKET = ">"
     COMMA = ","
     DOT = "."
     PLUS = "+"
@@ -62,7 +66,7 @@ class Token:
         return self.__str__()
 
 
-KEYWORDS = ["if", "else", "let", "do", "end"]
+KEYWORDS = ["if", "else", "let", "do", "end", "for", "in"]
 
 
 class Tokenizer:
