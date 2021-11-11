@@ -84,6 +84,8 @@ def repl(debug: bool = False):
         if line == 'exit':
             break
         tokens = Tokenizer(line).tokenize()
+        if debug:
+            pprint(tokens)
         prog = Parser(tokens).program()
         if debug:
             pprint(prog)
