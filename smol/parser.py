@@ -1,4 +1,3 @@
-from ast import keyword
 from dataclasses import dataclass
 from textwrap import dedent
 from typing import Callable, Literal, TypeVar
@@ -310,25 +309,52 @@ class Parser:
     def expression_statement(self) -> Statement:
         return ExpressionStatement(self.expression())
 
-    def assignment_statement(self) -> Statement:
-        if self.current_token.type != TokenType.KEYWORD:
-            assert False
-        if self.current_token.image != "let":
-            assert False
+    def for_statement(self) -> Statement:
+        assert self.current_token.type == TokenType.KEYWORD
+        assert self.current_token.image == "for"
         self.next()
-        if self.current_token.type != TokenType.IDENTIFIER_LITERAL:
-            assert False
+        assert not self.ended, "Expected identifier after `for` but found `EOF`"
+        assert self.current_token.type == TokenType.IDENTIFIER_LITERAL
+        var = IdentifierExpression(self.current_token.image)
+        self.next()
+        assert not self.ended, "Expected `in` but found `EOF`"
+        assert self.current_token.type == TokenType.KEYWORD and self.current_token.image == "in"
+        self.next()
+        assert not self.ended, "Expected expression after `in` but found `EOF`"
+        collection = self.expression()
+        assert not self.ended, "Expected `do` or `:`, but found `EOF`"
+        match self.current_token:
+            case Token(TokenType.KEYWORD, "do"):
+                body = self.do_block_expression()
+            case Token(TokenType.COLON):
+                self.next()
+                assert not self.ended, "Expected expression after `:` but found `EOF`"
+                body = self.expression()
+            case _:
+                assert False, "Expected `do` or `:`"
+        return ForStatement(var, collection, body)
+
+    def assignment_statement(self) -> Statement:
+        assert self.current_token.type == TokenType.KEYWORD, "Expected `let`"
+        assert self.current_token.image == "let", "Expected `let`"
+        self.next()
+        assert not self.ended, "Expected identifier after `let` but found `EOF`"
+        assert self.current_token.type == TokenType.IDENTIFIER_LITERAL, "Expected identifier after `let` but found `{self.current_token.image}`"
         identifier = IdentifierExpression(self.current_token.image)
         self.next()
+        assert not self.ended, "Expected `=` but found `EOF`"
         assert self.current_token.type == TokenType.EQUALS
         self.next()
+        assert not self.ended, "Expected expression after `=` but found `EOF`"
         value = self.expression()
         return AssignmentStatement(identifier, value)
 
     def statement(self) -> Statement:
-        if self.current_token.type == TokenType.KEYWORD:
-            if self.current_token.image == "let":
+        match(self.current_token):
+            case Token(TokenType.KEYWORD, "let"):
                 return self.assignment_statement()
+            case Token(TokenType.KEYWORD, "for"):
+                return self.for_statement()
         return self.expression_statement()
 
     def program(self) -> Program:
