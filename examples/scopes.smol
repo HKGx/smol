@@ -2,4 +2,4 @@ do
     let foo = 2
     print(foo)
 end
-print(1)
+print(foo)
