@@ -132,8 +132,8 @@ class Parser:
     def __init__(self, tokens: list[Token]):
         self.tokens = tokens
 
-    def next(self):
-        self.current += 1
+    def next(self, increment: int = 1):
+        self.current += increment
 
     def expression(self) -> Expression:
         return self.equality()
@@ -258,29 +258,22 @@ class Parser:
         assert not self.ended, "Expected `:` or `do` but found `EOF`"
         body = self.if_body()
         elifs: list[tuple[Expression, Expression]] = []
-        # TODO: this can be simplified based on match statement
-        while(not self.ended
-              and self.current_token.type == TokenType.KEYWORD
-              and self.current_token.image == "else"
-              and self.peek_next
-              and self.peek_next.type == TokenType.KEYWORD
-              and self.peek_next.image == "if"):
-            self.next()
-            if self.current_token.type == TokenType.KEYWORD:
-                assert self.current_token.image == "if", "Expected `if`"
-                self.next()
-                else_condition = self.expression()
-                else_if_body = self.if_body()
-                elifs.append((else_condition, else_if_body))
-            else:
-                assert False, "Expected `if`"
-        else_body: Expression | None = None
-        if self.ended:
-            return IfExpression(condition, body, elifs, else_body)
-        if self.current_token.type == TokenType.KEYWORD and self.current_token.image == "else":
-            self.next()
-            else_body = self.if_body()
-        return IfExpression(condition, body, elifs, else_body)
+        while(not self.ended):
+            match (self.current_token, self.peek_next):
+                case (Token(TokenType.KEYWORD, "else"), Token(TokenType.KEYWORD, "if")):
+                    self.next(2)
+                    assert not self.ended, "Expected expression after `if` but found `EOF`"
+                    elif_condition = self.expression()
+                    assert not self.ended, "Expected `:` or `do` but found `EOF`"
+                    elif_body = self.if_body()
+                    elifs.append((elif_condition, elif_body))
+                case (Token(TokenType.KEYWORD, "else"), Token(TokenType.KEYWORD, "do") | Token(TokenType.COLON)):
+                    self.next()
+                    else_body = self.if_body()
+                    return IfExpression(condition, body, elifs, else_body)
+                case _:
+                    break
+        return IfExpression(condition, body, elifs, None)
 
     def parenthesized_expression(self) -> Expression:
         assert self.current_token.type == TokenType.LEFT_PAREN, "Expected '('"
