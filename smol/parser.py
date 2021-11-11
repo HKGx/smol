@@ -21,6 +21,11 @@ class IdentifierExpression(Expression):
 
 
 @dataclass
+class ArrayExpression(Expression):
+    elements: list[Expression]
+
+
+@dataclass
 class EqualityExpression(Expression):
     left: Expression
     sign: Literal['='] | Literal['!=']
@@ -97,8 +102,8 @@ class AssignmentStatement(Statement):
 
 @dataclass
 class ForStatement(Statement):
-    name: IdentifierExpression
-    iter: Expression
+    ident: IdentifierExpression
+    value: Expression
     body: Expression
 
 
@@ -196,6 +201,23 @@ class Parser:
             return NegationExpression(self.atomic())
         return self.atomic()
 
+    def array_literal(self) -> Expression:
+        assert self.current_token.type == TokenType.LEFT_BRACKET
+        self.next()
+        elements = []
+        while not self.ended:
+            match self.current_token:
+                case Token(TokenType.RIGHT_BRACKET):
+                    return ArrayExpression(elements)
+                case Token(TokenType.COMMA):
+                    self.next()
+                    assert not self.ended, "Expected expression after comma"
+                case _:
+                    elements.append(self.expression())
+                    assert self.current_token.type in (
+                        TokenType.COMMA, TokenType.RIGHT_BRACKET), f"Expected comma or right bracket, but got {self.current_token.image}"
+        assert False, "Unexpected end of file, expected closing `]`"
+
     def atomic(self) -> Expression:
         expr: Expression
         match self.current_token:
@@ -205,6 +227,8 @@ class Parser:
                 expr = self.if_expression()
             case Token(TokenType.INTEGER_LITERAL):
                 expr = IntegerExpression(int(self.current_token.image))
+            case Token(TokenType.LEFT_BRACKET):
+                expr = self.array_literal()
             case Token(TokenType.LEFT_PAREN):
                 expr = self.parenthesized_expression()
             case Token(TokenType.IDENTIFIER_LITERAL):
@@ -239,7 +263,7 @@ class Parser:
         assert self.current_token.image == "end", f"Expected `end` but got `{self.current_token.image}`"
         return BlockExpression(statements)
 
-    def if_body(self) -> Expression:
+    def enter_body(self) -> Expression:
         if self.current_token.type == TokenType.COLON:
             self.next()
             assert not self.ended, "Expected expression after `:` but found `EOF`"
@@ -247,18 +271,22 @@ class Parser:
         elif self.current_token.type == TokenType.KEYWORD:
             assert self.current_token.image == "do"
             body = self.do_block_expression()
+            if self.current_token.type == TokenType.KEYWORD:
+                assert self.current_token.image == "end"
+                self.next()
         else:
             assert False, "Expected `:` or `do`"
         return body
 
     def if_expression(self) -> Expression:
+        # TODO: Investigate as there might be a bug with `end` keyword
         assert self.current_token.type == TokenType.KEYWORD
         assert self.current_token.image == "if"
         self.next()
         assert not self.ended, "Expected expression after `if` but found `EOF`"
         condition = self.expression()
         assert not self.ended, "Expected `:` or `do` but found `EOF`"
-        body = self.if_body()
+        body = self.enter_body()
         elifs: list[tuple[Expression, Expression]] = []
         while(not self.ended):
             match (self.current_token, self.peek_next):
@@ -267,11 +295,11 @@ class Parser:
                     assert not self.ended, "Expected expression after `if` but found `EOF`"
                     elif_condition = self.expression()
                     assert not self.ended, "Expected `:` or `do` but found `EOF`"
-                    elif_body = self.if_body()
+                    elif_body = self.enter_body()
                     elifs.append((elif_condition, elif_body))
                 case (Token(TokenType.KEYWORD, "else"), Token(TokenType.KEYWORD, "do") | Token(TokenType.COLON)):
                     self.next()
-                    else_body = self.if_body()
+                    else_body = self.enter_body()
                     return IfExpression(condition, body, elifs, else_body)
                 case _:
                     break
@@ -323,16 +351,7 @@ class Parser:
         self.next()
         assert not self.ended, "Expected expression after `in` but found `EOF`"
         collection = self.expression()
-        assert not self.ended, "Expected `do` or `:`, but found `EOF`"
-        match self.current_token:
-            case Token(TokenType.KEYWORD, "do"):
-                body = self.do_block_expression()
-            case Token(TokenType.COLON):
-                self.next()
-                assert not self.ended, "Expected expression after `:` but found `EOF`"
-                body = self.expression()
-            case _:
-                assert False, "Expected `do` or `:`"
+        body = self.enter_body()
         return ForStatement(var, collection, body)
 
     def assignment_statement(self) -> Statement:

@@ -1,15 +1,15 @@
 from typing import Any
-
-from smol.parser import (AdditionExpression, AssignmentStatement, BlockExpression,
+from collections.abc import Iterable
+from smol.parser import (AdditionExpression, ArrayExpression, AssignmentStatement, BlockExpression,
                          ComparisonExpression, EqualityExpression,
                          ExponentatiotnExpression, Expression,
-                         ExpressionStatement, FunctionCallExpression,
+                         ExpressionStatement, ForStatement, FunctionCallExpression,
                          IdentifierExpression, IfExpression, IntegerExpression,
                          MultiplicationExpression, NegationExpression, Program,
                          Statement)
 
 
-RETURN_TYPE = int | float | None
+RETURN_TYPE = int | float | None | list["RETURN_TYPE"]
 
 
 class Interpreter:
@@ -96,6 +96,8 @@ class Interpreter:
                 for statement in statements:
                     last = self.execute(statement, state)
                 return last
+            case ArrayExpression(values):
+                return [self.evaluate(value, state) for value in values]
             case _:
                 raise NotImplementedError(
                     f"Unsupported expression: {expression}")
@@ -107,7 +109,13 @@ class Interpreter:
                 return state[ident.name]
             case ExpressionStatement(expression):
                 return self.evaluate(expression, state)
-            # TODO: implement for loops
+            case ForStatement(ident, value, body):
+                values = self.evaluate(value, state)
+                if not isinstance(values, Iterable):
+                    raise TypeError(f"{values} is not iterable")
+                for val in values.__iter__():
+                    state[ident.name] = val
+                    self.evaluate(body, state)
             case _:
                 raise NotImplementedError(
                     f"Unsupported statement: {statement}")
