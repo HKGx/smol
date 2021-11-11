@@ -100,6 +100,7 @@ class AssignmentStatement(Statement):
 class ForStatement(Statement):
     name: IdentifierExpression
     iter: Expression
+    body: Expression
 
 
 @dataclass
