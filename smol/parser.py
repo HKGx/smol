@@ -339,7 +339,8 @@ class Parser:
         assert self.current_token.image == "let", "Expected `let`"
         self.next()
         assert not self.ended, "Expected identifier after `let` but found `EOF`"
-        assert self.current_token.type == TokenType.IDENTIFIER_LITERAL, "Expected identifier after `let` but found `{self.current_token.image}`"
+        assert self.current_token.match(
+            TokenType.IDENTIFIER_LITERAL), "Expected identifier after `let` but found `{self.current_token.image}`"
         identifier = IdentifierExpression(self.current_token.image)
         self.next()
         assert not self.ended, "Expected `=` but found `EOF`"
