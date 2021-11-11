@@ -63,7 +63,7 @@ def stringify(expression: Expression, indent: int = 0) -> str:
 
 
 def compile_file(file: TextIOWrapper):
-    pass
+    raise NotImplementedError("Compiling files is not implemented yet")
 
 
 def interpret_file(file: TextIOWrapper):
@@ -94,7 +94,8 @@ if __name__ == "__main__":
         description='Interpreter for the smol language')
     parser.add_argument("run_type", nargs="?", choices=[
                         'repl', "r", 'interpret', "i", 'compile', "c`"], help="Run type")
-    parser.add_argument('file', nargs='?', help='File to interpret', type=open)
+    parser.add_argument('file', nargs='?',
+                        help='File to interpret', type=open)
     prased_args = parser.parse_args()
     # If no args or run_type == "repl"
     if not prased_args.run_type or prased_args.run_type == "repl":
