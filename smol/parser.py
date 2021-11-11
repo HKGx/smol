@@ -222,7 +222,6 @@ class Parser:
                 {" ".join(last_tokens_images)}
                 """)
         self.next()
-        assert expr is not None, "Technically unreachable"
         return expr
 
     def do_block_expression(self) -> Expression:
@@ -230,10 +229,14 @@ class Parser:
         assert self.current_token.image == "do"
         self.next()
         statements = []
-        while (not self.ended
-               and not self.current_token.type == TokenType.KEYWORD
-               and not self.current_token.image == "end"):
+        while (not self.ended):
+            match self.current_token:
+                case Token(TokenType.KEYWORD, "end"):
+                    break
             statements.append(self.statement())
+        assert not self.ended, "Expected `end` but got end of file"
+        assert self.current_token.type == TokenType.KEYWORD
+        assert self.current_token.image == "end", f"Expected `end` but got `{self.current_token.image}`"
         self.next()
         return BlockExpression(statements)
 
@@ -293,12 +296,16 @@ class Parser:
         # parse arguments
         # TODO: implement named arguments
         args = []
-        while (not self.ended and self.current_token.type != TokenType.RIGHT_PAREN):
-            if self.current_token.type == TokenType.COMMA:
-                self.next()
-            args.append(self.expression())
+        while (not self.ended):
+            match self.current_token:
+                case Token(TokenType.RIGHT_PAREN):
+                    break
+                case Token(TokenType.COMMA):
+                    self.next()
+                    continue
+                case _:
+                    args.append(self.expression())
         assert self.current_token.type == TokenType.RIGHT_PAREN, "Expected ')'"
-        self.next()
         return FunctionCallExpression(name, args)
 
     def expression_statement(self) -> Statement:
