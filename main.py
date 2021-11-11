@@ -62,25 +62,31 @@ def stringify(expression: Expression, indent: int = 0) -> str:
     raise Exception(f"Unexpected expression: {expression}")
 
 
-def compile_file(file: TextIOWrapper):
+def compile_file(file: TextIOWrapper, debug: bool = False):
     raise NotImplementedError("Compiling files is not implemented yet")
 
 
-def interpret_file(file: TextIOWrapper):
+def interpret_file(file: TextIOWrapper, debug: bool = False):
     tokens = Tokenizer(file.read()).tokenize()
+    if debug:
+        pprint(tokens)
     prog = Parser(tokens).program()
+    if debug:
+        pprint(prog)
     print(program(prog))
     interpreter = Interpreter(prog)
     print(interpreter.run())
 
 
-def repl():
+def repl(debug: bool = False):
     while True:
         line = input('> ')
         if line == 'exit':
             break
         tokens = Tokenizer(line).tokenize()
         prog = Parser(tokens).program()
+        if debug:
+            pprint(prog)
         print(program(prog))
         interpreter = Interpreter(prog)
         print(interpreter.run())
@@ -96,14 +102,14 @@ if __name__ == "__main__":
                         'repl', "r", 'interpret', "i", 'compile', "c`"], help="Run type")
     parser.add_argument('file', nargs='?',
                         help='File to interpret', type=open)
-    prased_args = parser.parse_args()
-    # If no args or run_type == "repl"
-    if not prased_args.run_type or prased_args.run_type == "repl":
-        repl()
-    # If file not provided raise error
-    if not prased_args.file:
-        raise Exception("File not provided")
-    if prased_args.run_type == "interpret":
-        interpret_file(prased_args.file)
-    elif prased_args.run_type == "compile":
-        compile_file(prased_args.file)
+    parser.add_argument("--debug", "-d", action="store_true")
+    parsed_args = parser.parse_args()
+    match (parsed_args.file, parsed_args.run_type):
+        case (None, 'repl' | "r"):
+            repl(parsed_args.debug)
+        case (_, "interpret" | "i"):
+            interpret_file(parsed_args.file, parsed_args.debug)
+        case (_, "compile" | "c"):
+            compile_file(parsed_args.file, parsed_args.debug)
+        case (_, _):
+            raise Exception("Invalid run_type")
