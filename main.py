@@ -27,7 +27,7 @@ def statement(stmt: Statement, indent: int = 0) -> str:
 
 
 def stringify(expression: Expression, indent: int = 0) -> str:
-    # TODO: improve intendation
+    # TODO: improve indentation
     match expression:
         case IdentifierExpression(value):
             return "\t" * indent + value
