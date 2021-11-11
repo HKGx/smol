@@ -237,7 +237,6 @@ class Parser:
         assert not self.ended, "Expected `end` but got end of file"
         assert self.current_token.type == TokenType.KEYWORD
         assert self.current_token.image == "end", f"Expected `end` but got `{self.current_token.image}`"
-        self.next()
         return BlockExpression(statements)
 
     def if_body(self) -> Expression:
