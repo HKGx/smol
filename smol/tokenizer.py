@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from enum import Enum, auto
+from functools import cached_property, lru_cache
 
 
 class TokenType(Enum):
@@ -33,6 +34,13 @@ class TokenType(Enum):
     STRING_LITERAL = auto()
     KEYWORD = auto()
     IDENTIFIER_LITERAL = auto()
+
+    @staticmethod
+    @lru_cache
+    def first_characters() -> list[str]:
+        return [
+            str(t.value)[0] for t in TokenType.__members__.values() if not isinstance(t.value, int)
+        ]
 
 
 @dataclass
@@ -143,43 +151,29 @@ class Tokenizer:
             self.skip_whitespace()
             if self.ended:
                 break
-            # TODO: clean this up
-            if self.current_character in [
-                t.value for t in TokenType.__members__.values()
-            ] + ["!"]:
-                if self.current_character in [">", "<"] and (self.peek and self.peek == "="):
-                    self._tokens.append(
-                        Token(
-                            type=TokenType(
-                                self.current_character + self.peek),
-                            image=self.current_character + self.peek,
-                            line=self.current_line,
-                            column=self.current_column,
-                        )
-                    )
-                    self.current_source_idx += 1
-                    self.current_column += 1
-                elif self.current_character == "!":
-                    if self.peek and self.peek == "=":
+            if self.current_character in TokenType.first_characters():
+                match (self.current_character, self.peek):
+                    case (">" | "<" | "!", "="):
                         self._tokens.append(
                             Token(
-                                type=TokenType.NOT_EQUALS,
-                                image="!=",
+                                type=TokenType(
+                                    self.current_character + self.peek),
+                                image=self.current_character + self.peek,
                                 line=self.current_line,
                                 column=self.current_column,
                             )
                         )
                         self.current_source_idx += 1
                         self.current_column += 1
-                else:
-                    self._tokens.append(
-                        Token(
-                            type=TokenType(self.current_character),
-                            image=self.current_character,
-                            line=self.current_line,
-                            column=self.current_column,
+                    case _:
+                        self._tokens.append(
+                            Token(
+                                type=TokenType(self.current_character),
+                                image=self.current_character,
+                                line=self.current_line,
+                                column=self.current_column,
+                            )
                         )
-                    )
 
                 self.current_source_idx += 1
                 self.current_column += 1
