@@ -23,6 +23,7 @@ class Scope(dict[str, Any]):
         return new
 
     def __init__(self, parent: "Scope" = None):
+        super().__init__()
         self.parent = parent
 
     def rec_contains(self, o: object) -> bool:
