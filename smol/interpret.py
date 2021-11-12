@@ -1,5 +1,6 @@
 from typing import Any, Optional
 from collections.abc import Iterable
+from smol.checker import Scope
 from smol.parser import (AdditionExpression, ArrayExpression, AssignmentStatement, BlockExpression, BreakExpression,
                          ComparisonExpression, ContinueExpression, EqualityExpression,
                          ExponentiationExpression, Expression,
@@ -12,49 +13,6 @@ from smol.parser import (AdditionExpression, ArrayExpression, AssignmentStatemen
 RETURN_TYPE = int | float | None | str | list["RETURN_TYPE"]
 
 
-class Scope(dict[str, Any]):
-    parent: Optional["Scope"] = None
-
-    @classmethod
-    def from_dict(cls, d: dict[str, Any]):
-        new = cls()
-        for k, v in d.items():
-            new[k] = v
-        return new
-
-    def __init__(self, parent: "Scope" = None):
-        super().__init__()
-        self.parent = parent
-
-    def rec_contains(self, o: object) -> bool:
-        if o in self:
-            return True
-        if self.parent is None:
-            return False
-        return self.parent.rec_contains(o)
-
-    def rec_get(self, key: str):
-        if key in self:
-            return self[key]
-        if self.parent is None:
-            raise KeyError(key)
-        return self.parent.rec_get(key)
-
-    def rec_set(self, key: str, value: Any) -> bool:
-        if self.parent is None:
-            self[key] = value
-            return True
-        if self.parent is not None:
-            if self.parent.rec_contains(key):
-                return self.parent.rec_set(key, value)
-            self[key] = value
-            return True
-        return False
-
-    def spawn_child(self):
-        return Scope(parent=self)
-
-
 class BreakException(Exception):
     pass
 
@@ -65,7 +23,7 @@ class ContinueException(Exception):
 
 class Interpreter:
     program: Program
-    scope: Scope = Scope.from_dict({
+    scope: Scope[Any] = Scope.from_dict({
         'print': print,
         'range': range,
         'str': str

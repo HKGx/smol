@@ -1,5 +1,6 @@
 from io import TextIOWrapper
 from pprint import pprint
+from smol.checker import Checker
 
 from smol.interpret import Interpreter
 from smol.parser import (AdditionExpression, ArrayExpression, AssignmentStatement,
@@ -101,6 +102,8 @@ def repl(debug: bool = False):
         if debug:
             pprint(prog)
         print(program(prog))
+        checker = Checker(prog)
+        print(checker.check())
         interpreter = Interpreter(prog)
         print(interpreter.run())
 
