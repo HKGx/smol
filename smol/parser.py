@@ -333,7 +333,6 @@ class Parser:
         expr = self.expression()
         assert not self.ended, "Expected ')' but found 'EOF'"
         assert self.current_token.type == TokenType.RIGHT_PAREN, "Expected ')'"
-        self.next()
         return expr
 
     def function_call(self) -> Expression:
