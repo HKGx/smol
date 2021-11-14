@@ -30,8 +30,6 @@ class TokenType(Enum):
     NOT_EQUALS = "!="
     SMALLER_OR_EQUAL_THAN = "<="
     GREATER_OR_EQUAL_THAN = ">="
-    # Identifier tokens
-    IDENTIFIER = auto()
     # Literal tokens
     INTEGER_LITERAL = auto()
     FLOAT_LITERAL = auto()
@@ -223,7 +221,8 @@ class Tokenizer:
                 self.increment()
             elif self.current_character.isdigit():  # integer literal
                 self._tokens.append(self.integer_literal())
-            elif self.current_character.isalpha() or self.current_character in ("_"):  # identifier literal
+            elif (self.current_character.isalpha()
+                  or self.current_character in ("_")):  # identifier literal
                 self._tokens.append(self.identifier_literal())
             else:
                 print(f"Unknown character {self.current_character}")
