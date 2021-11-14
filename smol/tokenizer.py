@@ -168,7 +168,9 @@ class Tokenizer:
         Parse identifier literal and return Token
         """
         start = self.current_source_idx
-        while not self.ended and (self.current_character.isalnum() or self.current_character == "_"):
+        while (not self.ended
+               and (self.current_character.isalnum()
+                    or self.current_character == "_")):
             self.increment()
         image = self.source[start: self.current_source_idx]
 
