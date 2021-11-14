@@ -343,8 +343,8 @@ class Parser:
         self.next()
         # parse arguments
         # TODO: implement named arguments
-        args = []
-        while (not self.ended):
+        args: list[Expression] = []
+        while not self.ended:
             match self.current_token:
                 case Token(TokenType.RIGHT_PAREN):
                     break
