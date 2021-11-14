@@ -101,8 +101,12 @@ def interpret_file(file: TextIOWrapper, debug: bool = False):
     if debug:
         pprint(prog)
     pprint(program(prog))
-    interpreter = Interpreter(prog)
-    pprint(interpreter.run())
+    checker = Checker(prog)
+    for error in checker.check():
+        print(error)
+    if not checker.has_errors:
+        interpreter = Interpreter(prog)
+        pprint(interpreter.run())
 
 
 def repl(debug: bool = False):
@@ -121,9 +125,9 @@ def repl(debug: bool = False):
         for error in checker.check():
             print(error)
         if not checker.has_errors:
-            print("No errors found")
-        interpreter = Interpreter(prog)
-        pprint(interpreter.run())
+            print("No errors found during typecheking")
+            interpreter = Interpreter(prog)
+            pprint(interpreter.run())
 
 
 if __name__ == "__main__":
