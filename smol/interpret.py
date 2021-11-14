@@ -1,6 +1,6 @@
 from typing import Any
 from collections.abc import Iterable
-from smol.checker import Scope
+from smol.utils import Scope
 from smol.parser import (AdditionExpression, ArrayExpression, AssignmentStatement, BlockExpression, BreakExpression,
                          ComparisonExpression, ContinueExpression, EqualityExpression,
                          ExponentiationExpression, Expression,
@@ -32,6 +32,13 @@ class Interpreter:
     def __init__(self, program: Program):
         self.program = program
 
+    def lr_evaluate(self, lhs: Expression, rhs: Expression, scope: Scope = None) -> tuple[RETURN_TYPE, RETURN_TYPE]:
+        if scope is None:
+            scope = self.scope
+        lhs_val = self.evaluate(lhs, scope)
+        rhs_val = self.evaluate(rhs, scope)
+        return lhs_val, rhs_val
+
     def evaluate(self, expression: Expression, scope: Scope = None) -> RETURN_TYPE:
         # TODO: assist runtime type checking with compile-time type checking
         if scope is None:
@@ -40,22 +47,19 @@ class Interpreter:
             case IntegerExpression(value):
                 return value
             case ExponentiationExpression(left, sign, right):
-                lhs = self.evaluate(left, scope)
-                rhs = self.evaluate(right, scope)
+                lhs, rhs = self.lr_evaluate(left, right, scope)
                 assert isinstance(lhs, (int, float)), f"{lhs} is not a number"
                 assert isinstance(rhs, (int, float)), f"{rhs} is not a number"
                 return lhs ** rhs
             case MultiplicationExpression(left, sign, right):
-                lhs = self.evaluate(left, scope)
-                rhs = self.evaluate(right, scope)
+                lhs, rhs = self.lr_evaluate(left, right, scope)
                 assert isinstance(lhs, (int, float)), f"{lhs} is not a number"
                 assert isinstance(rhs, (int, float)), f"{rhs} is not a number"
                 if sign == '*':
                     return lhs * rhs
                 return lhs / rhs
             case AdditionExpression(left, sign, right):
-                lhs = self.evaluate(left, scope)
-                rhs = self.evaluate(right, scope)
+                lhs, rhs = self.lr_evaluate(left, right, scope)
                 if isinstance(lhs, str) and isinstance(rhs, str):
                     return lhs + rhs
                 assert isinstance(lhs, (int, float)), f"{lhs} is not a number"
@@ -64,8 +68,7 @@ class Interpreter:
                     return lhs + rhs
                 return lhs - rhs
             case ComparisonExpression(left, sign, right):
-                lhs = self.evaluate(left, scope)
-                rhs = self.evaluate(right, scope)
+                lhs, rhs = self.lr_evaluate(left, right, scope)
                 assert isinstance(lhs, (int, float)), f"{lhs} is not a number"
                 assert isinstance(rhs, (int, float)), f"{rhs} is not a number"
                 comparison_map = {
@@ -78,8 +81,7 @@ class Interpreter:
                 return fun(rhs)
 
             case EqualityExpression(left, sign, right):
-                lhs = self.evaluate(left, scope)
-                rhs = self.evaluate(right, scope)
+                lhs, rhs = self.lr_evaluate(left, right, scope)
 
                 if sign == "=":
                     return lhs == rhs
