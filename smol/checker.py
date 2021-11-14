@@ -1,22 +1,27 @@
+import dataclasses
 from dataclasses import dataclass
-from typing import NamedTuple, Optional
+from typing import NamedTuple, Optional, Tuple
 
-from smol.utils import Scope
 from smol.parser import (AdditionExpression, ArrayExpression,
-                         AssignmentStatement, BlockExpression, ComparisonExpression, EqualityExpression, ExponentiationExpression,
-                         Expression, ExpressionStatement, ForStatement,
+                         AssignmentStatement, BlockExpression,
+                         ComparisonExpression, EqualityExpression,
+                         ExponentiationExpression, Expression,
+                         ExpressionStatement, ForStatement,
                          FunctionCallExpression, IdentifierExpression,
                          IfExpression, IntegerExpression,
                          MultiplicationExpression, NegationExpression, Program,
-                         Statement, StringExpression)
+                         Statement, StringExpression, WhileStatement)
+from smol.utils import Scope
 
 
 @dataclass
 class CheckerType:
     name: str
+    meta: dict[str, bool] = dataclasses.field(
+        init=False, default_factory=dict, compare=False)
 
 
-@dataclass
+@dataclass(eq=True)
 class InvalidType(CheckerType):
     name = "invalid"
 
@@ -37,6 +42,12 @@ class MappingType(CheckerType):
 class TypedExpression:
     type: CheckerType
     value: Expression
+
+
+@dataclass
+class TypedStatement:
+    type: CheckerType
+    value: Statement
 
 
 class UnknownIdentifier(Exception):
@@ -72,11 +83,15 @@ class Checker:
         self.check_program(self.program)
         return self.errors
 
+    @property
+    def has_errors(self):
+        return len(self.errors) > 0
+
     def check_program(self, program: Program):
         for statement in program.statements:
             self.check_statement(statement)
 
-    def lr_evaluate(self, lhs: Expression, rhs: Expression, scope: Scope = None) -> Tuple[CheckerType, CheckerType]:
+    def lr_evaluate(self, lhs: Expression, rhs: Expression, scope: Scope = None) -> Tuple[TypedExpression, TypedExpression]:
         if scope is None:
             scope = self.scope
         lhs_type = self.evaluate_type_expression(lhs, scope)
@@ -118,46 +133,42 @@ class Checker:
                                 return TypedExpression(BuiltInType.int, expr)
                             case (BuiltInType.string, BuiltInType.string):
                                 return TypedExpression(BuiltInType.string, expr)
-                            case _:
-                                self.errors.append(
-                                    f"Invalid operation: {l_typ.type.name} + {r_typ.type.name}")
+
                     case "-":
                         match (l_typ.type, r_typ.type):
                             case (BuiltInType.int, BuiltInType.int):
                                 return TypedExpression(BuiltInType.int, expr)
-                            case _:
-                                self.errors.append(
-                                    f"Invalid operation: {l_typ.type.name} - {r_typ.type.name}")
-                                return TypedExpression(BuiltInType.invalid, expr)
+
+                self.errors.append(
+                    f"Invalid operation: {l_typ.type.name} {sign} {r_typ.type.name}")
+                return TypedExpression(BuiltInType.invalid, expr)
             case MultiplicationExpression(left, sign, right) as expr:
                 l_typ, r_typ = self.lr_evaluate(left, right, scope)
                 match (l_typ.type, r_typ.type):
                     case (BuiltInType.int, BuiltInType.int):
                         return TypedExpression(BuiltInType.int, expr)
-                    case _:
-                        self.errors.append(
-                            f"Invalid operation: {l_typ.type.name} {sign} {r_typ.type.name}")
-                        return TypedExpression(BuiltInType.invalid, expr)
+
+                self.errors.append(
+                    f"Invalid operation: {l_typ.type.name} {sign} {r_typ.type.name}")
+                return TypedExpression(BuiltInType.invalid, expr)
             case ExponentiationExpression(left, sign, right) as expr:
                 l_typ, r_typ = self.lr_evaluate(left, right, scope)
                 match (l_typ.type, r_typ.type):
                     case (BuiltInType.int, BuiltInType.int):
                         return TypedExpression(BuiltInType.int, expr)
-                    case _:
-                        self.errors.append(
-                            f"Invalid operation: {l_typ.type} {sign} {r_typ.type}"
-                        )
-                        return TypedExpression(BuiltInType.invalid, expr)
+
+                self.errors.append(
+                    f"Invalid operation: {l_typ.type} {sign} {r_typ.type}"
+                )
+                return TypedExpression(BuiltInType.invalid, expr)
             case NegationExpression(expression) as expr:
                 typ = self.evaluate_type_expression(expression, scope)
-                match typ.type:
-                    case BuiltInType.int:
-                        return TypedExpression(BuiltInType.int, expr)
-                    case _:
-                        self.errors.append(
-                            f"Invalid operation: -{typ.type}"
-                        )
-                        return TypedExpression(BuiltInType.invalid, expr)
+                if typ.type != BuiltInType.int:
+                    self.errors.append(
+                        f"Invalid operation: -{typ.type}"
+                    )
+                    return TypedExpression(BuiltInType.invalid, expr)
+                return TypedExpression(BuiltInType.int, expr)
             case IfExpression(condition, body, else_ifs, else_body) as expr:
                 condition_type = self.evaluate_type_expression(
                     condition, scope)
@@ -167,7 +178,7 @@ class Checker:
                     return TypedExpression(BuiltInType.invalid, expr)
                 body_typ = self.evaluate_type_expression(
                     body, scope.spawn_child())
-                if body_typ is BuiltInType.invalid:
+                if body_typ.type == BuiltInType.invalid:
                     self.errors.append(
                         f"Invalid if statement: {body} is not a valid expression"
                     )
@@ -176,14 +187,14 @@ class Checker:
                 for else_if in else_ifs:
                     else_if_cond_type = self.evaluate_type_expression(
                         else_if[0], scope)
-                    if else_if_cond_type is BuiltInType.invalid:
+                    if else_if_cond_type.type == BuiltInType.invalid:
                         self.errors.append(
                             f"Invalid else if statement: {else_if[0]} is not a valid expression"
                         )
                         return TypedExpression(BuiltInType.invalid, expr)
                     else_if_body_type = self.evaluate_type_expression(
                         else_if[1], scope.spawn_child())
-                    if else_if_body_type is BuiltInType.invalid:
+                    if else_if_body_type.type == BuiltInType.invalid:
                         self.errors.append(
                             f"Invalid else if statement: {else_if[1]} is not a valid expression"
                         )
@@ -192,7 +203,7 @@ class Checker:
                 if else_body is not None:
                     else_body_type = self.evaluate_type_expression(
                         else_body, scope.spawn_child())
-                    if else_body_type is BuiltInType.invalid:
+                    if else_body_type.type == BuiltInType.invalid:
                         self.errors.append(
                             f"Invalid else statement: {else_body} is not a valid expression"
                         )
@@ -219,66 +230,123 @@ class Checker:
                 )
                 return TypedExpression(BuiltInType.invalid, expr)
             case FunctionCallExpression(name, args) as expr:
+                if not scope.rec_get(name.name):
+                    self.errors.append(
+                        f"Invalid function call: {name} is not a valid function")
+                    return TypedExpression(BuiltInType.invalid, expr)
+
                 function_type = scope.rec_get(name.name)
-                match function_type:
-                    case MappingType(_, from_type, to_type):
-                        arg_types = [self.evaluate_type_expression(
-                            arg, scope) for arg in args]
-                        if not all(arg_type.type == from_type for arg_type in arg_types):
-                            self.errors.append(
-                                f"Invalid operation: {name.name}({arg_types[0].type})"
-                            )
-                            return TypedExpression(BuiltInType.invalid, expr)
-                        return TypedExpression(to_type, expr)
-                    case _:
-                        self.errors.append(
-                            f"Invalid operation: {name.name}({function_type.name})"
-                        )
-                        return TypedExpression(BuiltInType.invalid, expr)
+                if not isinstance(function_type, MappingType):
+                    self.errors.append(
+                        f"Invalid function call: {name} is not a valid function")
+                    return TypedExpression(BuiltInType.invalid, expr)
+                from_type = function_type.from_type
+                to_type = function_type.to_type
+                arg_types = [self.evaluate_type_expression(
+                    arg, scope) for arg in args]
+                if not all(arg_type.type == from_type for arg_type in arg_types):
+                    self.errors.append(
+                        f"Invalid operation: {name.name}({arg_types[0].type})"
+                    )
+                    return TypedExpression(BuiltInType.invalid, expr)
+                return TypedExpression(to_type, expr)
             case BlockExpression(statements) as expr:
                 for statement in statements[:-1]:
                     self.check_statement(statement, scope)
-                stat_type = self.check_statement(statements[-1], scope)
-                if stat_type is BuiltInType.invalid:
-                    self.errors.append(
-                        f"Invalid block: {statements[-1]} is not a valid statement"
-                    )
+                stat = self.check_statement(statements[-1], scope)
+                stat_type = stat.type
+                if stat.type == BuiltInType.invalid:
                     return TypedExpression(BuiltInType.invalid, expr)
-                if stat_type is None:
+                if stat_type == BuiltInType.none:
                     return TypedExpression(BuiltInType.none, expr)
                 return TypedExpression(stat_type, expr)
 
         self.errors.append(f"Unknown expression: {expression}")
         return TypedExpression(BuiltInType.invalid, expression)
 
-    def check_statement(self, statement: Statement, scope: Scope = None) -> Optional[CheckerType]:
+    def check_expr_statement(self, statement: ExpressionStatement, scope: Scope) -> TypedStatement:
+        typ = self.evaluate_type_expression(statement.value, scope)
+        if typ == BuiltInType.invalid:
+            self.errors.append(
+                f"Invalid expression statement: {statement.value} is not a valid expression"
+            )
+            return TypedStatement(BuiltInType.invalid, statement)
+        return TypedStatement(typ.type, statement)
+
+    def check_assignment_statement(self, statement: AssignmentStatement, scope: Scope[CheckerType]) -> TypedStatement:
+        ident_name = statement.name.name
+        expr = statement.value
+        if not scope.rec_contains(ident_name):
+            typ = self.evaluate_type_expression(expr, scope)
+            if statement.mutable:
+                new_typ = dataclasses.replace(typ.type)
+                new_typ.meta["mut"] = True
+                scope.rec_set(ident_name, new_typ)
+            else:
+                scope.rec_set(ident_name, typ.type)
+            return TypedStatement(typ.type, statement)
+        if statement.mutable:
+            self.errors.append(
+                f"Invalid assignment statement: {ident_name} is already defined. `mut` modifier can only be used when defining variables.")
+
+            return TypedStatement(BuiltInType.invalid, statement)
+        ident_type = scope.rec_get(ident_name)
+        expr_type = self.evaluate_type_expression(expr, scope)
+        if ident_type == expr_type.type and ident_type.meta.get("mut"):
+            scope.rec_set(ident_name, ident_type)
+            return TypedStatement(ident_type, statement)
+        if ident_type != expr_type.type and ident_type.meta.get("mut"):
+            self.errors.append(
+                f"Type mismatch: Tried assigning {expr_type.type} to {ident_name} of type {ident_type}")
+            return TypedStatement(BuiltInType.invalid, statement)
+        self.errors.append(
+            f"Invalid assignment statement: {ident_name} was assigned before and is not mutable"
+        )
+        return TypedStatement(BuiltInType.invalid, statement)
+
+    def check_while_statement(self, statement: WhileStatement, scope: Scope) -> TypedStatement:
+        condition = statement.condition
+        body = statement.body
+        typ = self.evaluate_type_expression(condition, scope)
+        if typ.type != BuiltInType.bool:
+            self.errors.append(
+                f"Invalid while condition: {typ} is not a valid boolean expression")
+            return TypedStatement(BuiltInType.invalid, statement)
+        self.evaluate_type_expression(body, scope)
+        return TypedStatement(BuiltInType.none, statement)
+
+    def check_for_statement(self, statement: ForStatement, scope: Scope) -> TypedStatement:
+        ident_name = statement.ident.name
+        value = statement.value
+        body = statement.body
+        if scope.rec_contains(ident_name):
+            self.errors.append(
+                f"Variable {ident_name} already defined")
+            return TypedStatement(BuiltInType.invalid, statement)
+        iterable_type = self.evaluate_type_expression(
+            value, scope).type
+
+        if not isinstance(iterable_type, ListType):
+            self.errors.append(
+                f"Type {iterable_type} is not iterable")
+            return TypedStatement(BuiltInType.invalid, statement)
+        inner_scope = scope.spawn_child()
+
+        # pylint: disable=no-member
+        inner_scope.rec_set(ident_name, iterable_type.type)
+        self.evaluate_type_expression(body, inner_scope)
+        return TypedStatement(BuiltInType.none, statement)
+
+    def check_statement(self, statement: Statement, scope: Scope = None) -> TypedStatement:
         if scope is None:
             scope = self.scope
         match statement:
-            case ExpressionStatement(expression):
-                typ = self.evaluate_type_expression(expression, scope)
-                return typ.type
-            case AssignmentStatement(identifier, expression):
-                if scope.rec_contains(identifier.name):
-                    self.errors.append(
-                        f"Variable {identifier.name} already defined")
-                else:
-                    typ = self.evaluate_type_expression(expression, scope)
-                    scope.rec_set(identifier.name, typ.type)
-                    return typ.type
-            case ForStatement(identifier, value, body):
-                if scope.rec_contains(identifier.name):
-                    self.errors.append(
-                        f"Variable {identifier.name} already defined")
-                else:
-                    iterable_type = self.evaluate_type_expression(
-                        value, scope).type
-
-                    if not isinstance(iterable_type, ListType):
-                        self.errors.append(
-                            f"Type {iterable_type} is not iterable")
-                        return BuiltInType.invalid
-                    assert isinstance(iterable_type, ListType)
-                    inner_scope = scope.spawn_child()
-                    inner_scope.rec_set(identifier.name, iterable_type.type)
-                    self.evaluate_type_expression(body, inner_scope)
+            case ExpressionStatement():
+                return self.check_expr_statement(statement, scope)
+            case AssignmentStatement():
+                return self.check_assignment_statement(statement, scope)
+            case ForStatement():
+                return self.check_for_statement(statement, scope)
+            case WhileStatement():
+                return self.check_while_statement(statement, scope)
+        return TypedStatement(BuiltInType.invalid, statement)

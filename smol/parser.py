@@ -113,6 +113,13 @@ class ExpressionStatement(Statement):
 class AssignmentStatement(Statement):
     name: IdentifierExpression
     value: Expression
+    mutable: bool
+
+
+@dataclass
+class WhileStatement(Statement):
+    condition: Expression
+    body: Expression
 
 
 @dataclass
@@ -353,6 +360,16 @@ class Parser:
     def expression_statement(self) -> Statement:
         return ExpressionStatement(self.expression())
 
+    def while_statement(self) -> Statement:
+        assert self.current_token.type == TokenType.KEYWORD
+        assert self.current_token.image == "while"
+        self.next()
+        assert not self.ended, "Expected expression after `while` but found `EOF`"
+        condition = self.expression()
+        assert not self.ended, "Expected `:` or `do` but found `EOF`"
+        body = self.enter_body()
+        return WhileStatement(condition, body)
+
     def for_statement(self) -> Statement:
         assert self.current_token.type == TokenType.KEYWORD
         assert self.current_token.image == "for"
@@ -370,6 +387,10 @@ class Parser:
         return ForStatement(var, collection, body)
 
     def assignment_statement(self) -> Statement:
+        is_mutable = False
+        if self.current_token.type == TokenType.KEYWORD and self.current_token.image == "mut":
+            is_mutable = True
+            self.next()
         assert self.current_token.type == TokenType.KEYWORD, "Expected `let`"
         assert self.current_token.image == "let", "Expected `let`"
         self.next()
@@ -383,14 +404,16 @@ class Parser:
         self.next()
         assert not self.ended, "Expected expression after `=` but found `EOF`"
         value = self.expression()
-        return AssignmentStatement(identifier, value)
+        return AssignmentStatement(identifier, value, is_mutable)
 
     def statement(self) -> Statement:
         match(self.current_token):
-            case Token(TokenType.KEYWORD, "let"):
+            case Token(TokenType.KEYWORD, "let" | "mut"):
                 return self.assignment_statement()
             case Token(TokenType.KEYWORD, "for"):
                 return self.for_statement()
+            case Token(TokenType.KEYWORD, "while"):
+                return self.while_statement()
         return self.expression_statement()
 
     def program(self) -> Program:

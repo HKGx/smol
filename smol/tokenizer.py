@@ -66,7 +66,8 @@ class Token:
         return self.__str__()
 
 
-KEYWORDS = {"if", "else", "let", "do", "end", "for", "in", "break", "continue"}
+KEYWORDS = {"if", "else", "mut", "let", "do", "end",
+            "while", "for", "in", "break", "continue"}
 
 
 class Tokenizer:

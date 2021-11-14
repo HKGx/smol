@@ -1,14 +1,16 @@
-from typing import Any
 from collections.abc import Iterable
-from smol.utils import Scope
-from smol.parser import (AdditionExpression, ArrayExpression, AssignmentStatement, BlockExpression, BreakExpression,
-                         ComparisonExpression, ContinueExpression, EqualityExpression,
-                         ExponentiationExpression, Expression,
-                         ExpressionStatement, ForStatement, FunctionCallExpression,
-                         IdentifierExpression, IfExpression, IntegerExpression,
-                         MultiplicationExpression, NegationExpression, Program,
-                         Statement, StringExpression)
+from typing import Any
 
+from smol.parser import (AdditionExpression, ArrayExpression,
+                         AssignmentStatement, BlockExpression, BreakExpression,
+                         ComparisonExpression, ContinueExpression,
+                         EqualityExpression, ExponentiationExpression,
+                         Expression, ExpressionStatement, ForStatement,
+                         FunctionCallExpression, IdentifierExpression,
+                         IfExpression, IntegerExpression,
+                         MultiplicationExpression, NegationExpression, Program,
+                         Statement, StringExpression, WhileStatement)
+from smol.utils import Scope
 
 RETURN_TYPE = int | float | None | str | list["RETURN_TYPE"]
 
@@ -140,6 +142,14 @@ class Interpreter:
                     raise TypeError(f"{values} is not iterable")
                 for val in values.__iter__():
                     scope.rec_set(ident.name, val)
+                    try:
+                        self.evaluate(body, scope)
+                    except BreakException:
+                        break
+                    except ContinueException:
+                        continue
+            case WhileStatement(condition, body):
+                while self.evaluate(condition, scope):
                     try:
                         self.evaluate(body, scope)
                     except BreakException:

@@ -1,10 +1,11 @@
 from io import TextIOWrapper
 from pprint import pprint
-from smol.checker import Checker
 
+from smol.checker import Checker
 from smol.interpret import Interpreter
-from smol.parser import (AdditionExpression, ArrayExpression, AssignmentStatement,
-                         BlockExpression, BreakExpression, ComparisonExpression, ContinueExpression,
+from smol.parser import (AdditionExpression, ArrayExpression,
+                         AssignmentStatement, BlockExpression, BreakExpression,
+                         ComparisonExpression, ContinueExpression,
                          EqualityExpression, ExponentiationExpression,
                          Expression, ExpressionStatement, ForStatement,
                          FunctionCallExpression, IdentifierExpression,
@@ -86,7 +87,10 @@ def check_file(file: TextIOWrapper, debug: bool = False):
     if debug:
         pprint(prog)
     checker = Checker(prog)
-    pprint(checker.check())
+    for error in checker.check():
+        print(error)
+    if not checker.has_errors:
+        print("No errors found")
 
 
 def interpret_file(file: TextIOWrapper, debug: bool = False):
@@ -114,7 +118,10 @@ def repl(debug: bool = False):
             pprint(prog)
         pprint(program(prog))
         checker = Checker(prog)
-        pprint(checker.check())
+        for error in checker.check():
+            print(error)
+        if not checker.has_errors:
+            print("No errors found")
         interpreter = Interpreter(prog)
         pprint(interpreter.run())
 
