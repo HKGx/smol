@@ -1,0 +1,7 @@
+let n = 10
+mut let out = 1
+for v in range(1, n) do
+    let out = out * v
+end
+
+print(str(out))
