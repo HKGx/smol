@@ -213,8 +213,7 @@ class Checker:
                 # TODO: Need to discuss whether we allow multiple types in an if statement to be returned
 
                 if body_types.count(body_types[0]) != len(body_types):
-                    self.errors.append(
-                        f"Invalid types of if bodies")
+                    self.errors.append("Invalid types of if bodies")
                     return TypedExpression(BuiltInType.invalid, expr)
 
                 return TypedExpression(body_types[0], expr)
@@ -287,7 +286,8 @@ class Checker:
             return TypedStatement(typ.type, statement)
         if statement.mutable:
             self.errors.append(
-                f"Invalid assignment statement: {ident_name} is already defined. `mut` modifier can only be used when defining variables.")
+                f"Invalid assignment statement: {ident_name} is already defined."
+                "`mut` modifier can only be used when defining variables.")
 
             return TypedStatement(BuiltInType.invalid, statement)
         ident_type = scope.rec_get(ident_name)

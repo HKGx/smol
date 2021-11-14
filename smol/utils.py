@@ -8,22 +8,22 @@ class Scope(dict[str, ScopeValue]):
     parent: Optional["Scope"] = None
 
     @classmethod
-    def from_dict(cls, d: dict[str, ScopeValue]):
+    def from_dict(cls, dict_: dict[str, ScopeValue]):
         new = cls()
-        for k, v in d.items():
-            new[k] = v
+        for key, value in dict_.items():
+            new[key] = value
         return new
 
     def __init__(self, parent: "Scope" = None):
         super().__init__()
         self.parent = parent
 
-    def rec_contains(self, o: str) -> bool:
-        if o in self:
+    def rec_contains(self, value: str) -> bool:
+        if value in self:
             return True
         if self.parent is None:
             return False
-        return self.parent.rec_contains(o)
+        return self.parent.rec_contains(value)
 
     def rec_get(self, key: str) -> ScopeValue:
         if key in self:

@@ -36,7 +36,10 @@ class Interpreter:
     def __init__(self, program: Program):
         self.program = program
 
-    def lr_evaluate(self, lhs: Expression, rhs: Expression, scope: Scope = None) -> tuple[RETURN_TYPE, RETURN_TYPE]:
+    def lr_evaluate(self,
+                    lhs: Expression,
+                    rhs: Expression,
+                    scope: Scope = None) -> tuple[RETURN_TYPE, RETURN_TYPE]:
         if scope is None:
             scope = self.scope
         lhs_val = self.evaluate(lhs, scope)
