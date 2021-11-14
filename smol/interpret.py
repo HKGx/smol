@@ -61,7 +61,7 @@ class Interpreter:
                 assert isinstance(rhs, (int, float)), f"{rhs} is not a number"
                 if sign == '*':
                     return lhs * rhs
-                return lhs / rhs
+                return lhs // rhs
             case AdditionExpression(left, sign, right):
                 lhs, rhs = self.lr_evaluate(left, right, scope)
                 if isinstance(lhs, str) and isinstance(rhs, str):
