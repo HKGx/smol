@@ -269,13 +269,14 @@ class Checker:
                     self.errors.append(
                         f"Variable {identifier.name} already defined")
                 else:
-                    value_type = self.evaluate_type_expression(value, scope)
+                    iterable_type = self.evaluate_type_expression(
+                        value, scope).type
 
-                    if not isinstance(value_type.type, ListType):
+                    if not isinstance(iterable_type, ListType):
                         self.errors.append(
-                            f"Type {value_type.type} is not iterable")
-                    else:
-                        inner_scope = scope.spawn_child()
-                        inner_scope.rec_set(
-                            identifier.name, value_type.type.type)
-                        self.evaluate_type_expression(body, inner_scope)
+                            f"Type {iterable_type} is not iterable")
+                        return BuiltInType.invalid
+                    assert isinstance(iterable_type, ListType)
+                    inner_scope = scope.spawn_child()
+                    inner_scope.rec_set(identifier.name, iterable_type.type)
+                    self.evaluate_type_expression(body, inner_scope)
