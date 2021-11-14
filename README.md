@@ -1,4 +1,6 @@
 # Smol /ᐠ｡ꞈ｡ᐟ\\
+[![wakatime](https://wakatime.com/badge/github/HKGx/smol.svg)](https://wakatime.com/badge/github/HKGx/smol)
+
 A programming language
 
 # Examples
@@ -34,3 +36,5 @@ They're yet to be reached, be patient! ฅ^•ﻌ•^ฅ
 Syntax is still under heated debate, it'll take time to settle on one thing
 
 Currently, we're dynamically and strongly typed, but it shall soon change as we add compile-time (parse-time?) type-checking.
+
+
