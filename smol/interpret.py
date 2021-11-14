@@ -1,58 +1,18 @@
-from typing import Any, Optional
 from collections.abc import Iterable
-from smol.parser import (AdditionExpression, ArrayExpression, AssignmentStatement, BlockExpression, BreakExpression,
-                         ComparisonExpression, ContinueExpression, EqualityExpression,
-                         ExponentiationExpression, Expression,
-                         ExpressionStatement, ForStatement, FunctionCallExpression,
-                         IdentifierExpression, IfExpression, IntegerExpression,
-                         MultiplicationExpression, NegationExpression, Program,
-                         Statement, StringExpression)
+from typing import Any
 
+from smol.parser import (AdditionExpression, ArrayExpression,
+                         AssignmentStatement, BlockExpression, BreakExpression,
+                         ComparisonExpression, ContinueExpression,
+                         EqualityExpression, ExponentiationExpression,
+                         Expression, ExpressionStatement, ForStatement,
+                         FunctionCallExpression, IdentifierExpression,
+                         IfExpression, IntegerExpression,
+                         MultiplicationExpression, NegationExpression, Program,
+                         Statement, StringExpression, WhileStatement)
+from smol.utils import Scope
 
 RETURN_TYPE = int | float | None | str | list["RETURN_TYPE"]
-
-
-class Scope(dict[str, Any]):
-    parent: Optional["Scope"] = None
-
-    @classmethod
-    def from_dict(cls, d: dict[str, Any]):
-        new = cls()
-        for k, v in d.items():
-            new[k] = v
-        return new
-
-    def __init__(self, parent: "Scope" = None):
-        super().__init__()
-        self.parent = parent
-
-    def rec_contains(self, o: object) -> bool:
-        if o in self:
-            return True
-        if self.parent is None:
-            return False
-        return self.parent.rec_contains(o)
-
-    def rec_get(self, key: str):
-        if key in self:
-            return self[key]
-        if self.parent is None:
-            raise KeyError(key)
-        return self.parent.rec_get(key)
-
-    def rec_set(self, key: str, value: Any) -> bool:
-        if self.parent is None:
-            self[key] = value
-            return True
-        if self.parent is not None:
-            if self.parent.rec_contains(key):
-                return self.parent.rec_set(key, value)
-            self[key] = value
-            return True
-        return False
-
-    def spawn_child(self):
-        return Scope(parent=self)
 
 
 class BreakException(Exception):
@@ -62,10 +22,12 @@ class BreakException(Exception):
 class ContinueException(Exception):
     pass
 
+# TODO: Add support for types inherited from checker
+
 
 class Interpreter:
     program: Program
-    scope: Scope = Scope.from_dict({
+    scope: Scope[Any] = Scope.from_dict({
         'print': print,
         'range': range,
         'str': str
@@ -73,6 +35,13 @@ class Interpreter:
 
     def __init__(self, program: Program):
         self.program = program
+
+    def lr_evaluate(self, lhs: Expression, rhs: Expression, scope: Scope = None) -> tuple[RETURN_TYPE, RETURN_TYPE]:
+        if scope is None:
+            scope = self.scope
+        lhs_val = self.evaluate(lhs, scope)
+        rhs_val = self.evaluate(rhs, scope)
+        return lhs_val, rhs_val
 
     def evaluate(self, expression: Expression, scope: Scope = None) -> RETURN_TYPE:
         # TODO: assist runtime type checking with compile-time type checking
@@ -82,22 +51,19 @@ class Interpreter:
             case IntegerExpression(value):
                 return value
             case ExponentiationExpression(left, sign, right):
-                lhs = self.evaluate(left, scope)
-                rhs = self.evaluate(right, scope)
+                lhs, rhs = self.lr_evaluate(left, right, scope)
                 assert isinstance(lhs, (int, float)), f"{lhs} is not a number"
                 assert isinstance(rhs, (int, float)), f"{rhs} is not a number"
                 return lhs ** rhs
             case MultiplicationExpression(left, sign, right):
-                lhs = self.evaluate(left, scope)
-                rhs = self.evaluate(right, scope)
+                lhs, rhs = self.lr_evaluate(left, right, scope)
                 assert isinstance(lhs, (int, float)), f"{lhs} is not a number"
                 assert isinstance(rhs, (int, float)), f"{rhs} is not a number"
                 if sign == '*':
                     return lhs * rhs
                 return lhs / rhs
             case AdditionExpression(left, sign, right):
-                lhs = self.evaluate(left, scope)
-                rhs = self.evaluate(right, scope)
+                lhs, rhs = self.lr_evaluate(left, right, scope)
                 if isinstance(lhs, str) and isinstance(rhs, str):
                     return lhs + rhs
                 assert isinstance(lhs, (int, float)), f"{lhs} is not a number"
@@ -106,8 +72,7 @@ class Interpreter:
                     return lhs + rhs
                 return lhs - rhs
             case ComparisonExpression(left, sign, right):
-                lhs = self.evaluate(left, scope)
-                rhs = self.evaluate(right, scope)
+                lhs, rhs = self.lr_evaluate(left, right, scope)
                 assert isinstance(lhs, (int, float)), f"{lhs} is not a number"
                 assert isinstance(rhs, (int, float)), f"{rhs} is not a number"
                 comparison_map = {
@@ -120,8 +85,7 @@ class Interpreter:
                 return fun(rhs)
 
             case EqualityExpression(left, sign, right):
-                lhs = self.evaluate(left, scope)
-                rhs = self.evaluate(right, scope)
+                lhs, rhs = self.lr_evaluate(left, right, scope)
 
                 if sign == "=":
                     return lhs == rhs
@@ -180,6 +144,14 @@ class Interpreter:
                     raise TypeError(f"{values} is not iterable")
                 for val in values.__iter__():
                     scope.rec_set(ident.name, val)
+                    try:
+                        self.evaluate(body, scope)
+                    except BreakException:
+                        break
+                    except ContinueException:
+                        continue
+            case WhileStatement(condition, body):
+                while self.evaluate(condition, scope):
                     try:
                         self.evaluate(body, scope)
                     except BreakException:

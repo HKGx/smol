@@ -1,9 +1,11 @@
 from io import TextIOWrapper
 from pprint import pprint
 
+from smol.checker import Checker
 from smol.interpret import Interpreter
-from smol.parser import (AdditionExpression, ArrayExpression, AssignmentStatement,
-                         BlockExpression, BreakExpression, ComparisonExpression, ContinueExpression,
+from smol.parser import (AdditionExpression, ArrayExpression,
+                         AssignmentStatement, BlockExpression, BreakExpression,
+                         ComparisonExpression, ContinueExpression,
                          EqualityExpression, ExponentiationExpression,
                          Expression, ExpressionStatement, ForStatement,
                          FunctionCallExpression, IdentifierExpression,
@@ -77,6 +79,20 @@ def compile_file(file: TextIOWrapper, debug: bool = False):
     raise NotImplementedError("Compiling files is not implemented yet")
 
 
+def check_file(file: TextIOWrapper, debug: bool = False):
+    tokens = Tokenizer(file.read()).tokenize()
+    if debug:
+        pprint(tokens)
+    prog = Parser(tokens).program()
+    if debug:
+        pprint(prog)
+    checker = Checker(prog)
+    for error in checker.check():
+        print(error)
+    if not checker.has_errors:
+        print("No errors found")
+
+
 def interpret_file(file: TextIOWrapper, debug: bool = False):
     tokens = Tokenizer(file.read()).tokenize()
     if debug:
@@ -84,9 +100,13 @@ def interpret_file(file: TextIOWrapper, debug: bool = False):
     prog = Parser(tokens).program()
     if debug:
         pprint(prog)
-    print(program(prog))
-    interpreter = Interpreter(prog)
-    print(interpreter.run())
+    pprint(program(prog))
+    checker = Checker(prog)
+    for error in checker.check():
+        print(error)
+    if not checker.has_errors:
+        interpreter = Interpreter(prog)
+        pprint(interpreter.run())
 
 
 def repl(debug: bool = False):
@@ -100,9 +120,14 @@ def repl(debug: bool = False):
         prog = Parser(tokens).program()
         if debug:
             pprint(prog)
-        print(program(prog))
-        interpreter = Interpreter(prog)
-        print(interpreter.run())
+        pprint(program(prog))
+        checker = Checker(prog)
+        for error in checker.check():
+            print(error)
+        if not checker.has_errors:
+            print("No errors found during typecheking")
+            interpreter = Interpreter(prog)
+            pprint(interpreter.run())
 
 
 if __name__ == "__main__":
@@ -112,7 +137,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description='Interpreter for the smol language')
     parser.add_argument("run_type", nargs="?", choices=[
-                        'repl', "r", 'interpret', "i", 'compile', "c"], help="Run type")
+                        'repl', "r", 'interpret', "i", 'compile', "c", "check"], help="Run type")
     parser.add_argument('file', nargs='?',
                         help='File to interpret', type=open)
     parser.add_argument("--debug", "-d", action="store_true")
@@ -120,9 +145,13 @@ if __name__ == "__main__":
     match (parsed_args.file, parsed_args.run_type):
         case (None, 'repl' | "r"):
             repl(parsed_args.debug)
+        case (None, _):
+            print("No file specified")
         case (_, "interpret" | "i"):
             interpret_file(parsed_args.file, parsed_args.debug)
         case (_, "compile" | "c"):
             compile_file(parsed_args.file, parsed_args.debug)
+        case (_, "check"):
+            check_file(parsed_args.file, parsed_args.debug)
         case (_, _):
             raise Exception("Invalid run_type")
