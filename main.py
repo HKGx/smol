@@ -11,7 +11,7 @@ from smol.parser import (AdditionExpression, ArrayExpression,
                          FunctionCallExpression, IdentifierExpression,
                          IfExpression, IntegerExpression,
                          MultiplicationExpression, NegationExpression, Parser,
-                         Program, Statement, StringExpression)
+                         Program, Statement, StringExpression, WhileStatement)
 from smol.tokenizer import Tokenizer
 
 
@@ -27,6 +27,8 @@ def statement(stmt: Statement, indent: int = 0) -> str:
             return stringify(expression, indent)
         case ForStatement(ident, expr, body):
             return f"for {stringify(ident)} in {stringify(expr)} do \n{stringify(body, indent + 1)}\nend"
+        case WhileStatement(condition, body):
+            return f"while {stringify(condition)} do \n{stringify(body, indent + 1)}\nend"
 
     raise Exception(f"Unexpected statement: {stmt}")
 
@@ -110,17 +112,21 @@ def interpret_file(file: TextIOWrapper, debug: bool = False):
 
 
 def repl(debug: bool = False):
+    content: list[str] = []
     while True:
-        line = input('> ')
-        if line == 'exit':
-            break
-        tokens = Tokenizer(line).tokenize()
+        line = input('> ' if len(content) == 0 else '. ')
+        # if two last lines are empty and user presses enter, we execute the program
+        if line != '' or not (len(content) > 0 and content[-1] == ''):
+            content.append(line)
+            continue
+        joined = '\n'.join(content)
+        tokens = Tokenizer(joined).tokenize()
         if debug:
             pprint(tokens)
         prog = Parser(tokens).program()
         if debug:
             pprint(prog)
-        pprint(program(prog))
+        print(program(prog))
         checker = Checker(prog)
         for error in checker.check():
             print(error)
@@ -128,6 +134,7 @@ def repl(debug: bool = False):
             print("No errors found during typecheking")
             interpreter = Interpreter(prog)
             pprint(interpreter.run())
+        content = []
 
 
 if __name__ == "__main__":
