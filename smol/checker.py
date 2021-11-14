@@ -61,6 +61,7 @@ class Checker:
     scope: Scope = Scope.from_dict({
         "print": MappingType("function", BuiltInType.string, BuiltInType.none),
         "str": MappingType("function", BuiltInType.int, BuiltInType.string),
+        "range": MappingType("function", BuiltInType.int, ListType("list", BuiltInType.int, None)),
     })
 
     def __init__(self, program: Program):
@@ -269,10 +270,12 @@ class Checker:
                         f"Variable {identifier.name} already defined")
                 else:
                     value_type = self.evaluate_type_expression(value, scope)
-                    if not isinstance(value_type, ListType):
+
+                    if not isinstance(value_type.type, ListType):
                         self.errors.append(
-                            f"Invalid operation: {value_type.type}[]")
+                            f"Type {value_type.type} is not iterable")
                     else:
                         inner_scope = scope.spawn_child()
-                        inner_scope.rec_set(identifier.name, value_type.type)
+                        inner_scope.rec_set(
+                            identifier.name, value_type.type.type)
                         self.evaluate_type_expression(body, inner_scope)
