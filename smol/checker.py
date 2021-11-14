@@ -76,6 +76,13 @@ class Checker:
         for statement in program.statements:
             self.check_statement(statement)
 
+    def lr_evaluate(self, lhs: Expression, rhs: Expression, scope: Scope = None) -> Tuple[CheckerType, CheckerType]:
+        if scope is None:
+            scope = self.scope
+        lhs_type = self.evaluate_type_expression(lhs, scope)
+        rhs_type = self.evaluate_type_expression(rhs, scope)
+        return lhs_type, rhs_type
+
     def evaluate_type_expression(self, expression: Expression, scope: Scope = None) -> TypedExpression:
         # TODO: Improve upon errors as they're really confusing
         if scope is None:
@@ -88,72 +95,67 @@ class Checker:
             case IdentifierExpression(name) as expr:
                 return TypedExpression(scope.rec_get(name), expr)
             case EqualityExpression(left, sign, right) as expr:
-                left_type = self.evaluate_type_expression(left, scope)
-                right_type = self.evaluate_type_expression(right, scope)
-                if left_type.type != right_type.type:
+                l_typ, r_typ = self.lr_evaluate(left, right, scope)
+                if l_typ.type != r_typ.type:
                     self.errors.append(
-                        f"{expr} has different types: {left_type.type} and {right_type.type}")
+                        f"{expr} has different types: {l_typ.type} and {r_typ.type}")
                     return TypedExpression(BuiltInType.invalid, expr)
                 return TypedExpression(BuiltInType.bool, expr)
             case ComparisonExpression(left, sign, right) as expr:
-                left_type = self.evaluate_type_expression(left, scope)
-                right_type = self.evaluate_type_expression(right, scope)
-                if left_type.type != right_type.type:
+                l_typ, r_typ = self.lr_evaluate(left, right, scope)
+                if l_typ.type != r_typ.type:
                     self.errors.append(
-                        f"{expr} has different types: {left_type.type} and {right_type.type}")
+                        f"{expr} has different types: {l_typ.type} and {r_typ.type}")
                     return TypedExpression(BuiltInType.invalid, expr)
                 return TypedExpression(BuiltInType.bool, expr)
 
             case AdditionExpression(left, sign,  right) as expr:
-                left_type = self.evaluate_type_expression(left, scope)
-                right_type = self.evaluate_type_expression(right, scope)
+                l_typ, r_typ = self.lr_evaluate(left, right, scope)
                 match sign:
                     case "+":
-                        match (left_type.type, right_type.type):
+                        match (l_typ.type, r_typ.type):
                             case (BuiltInType.int, BuiltInType.int):
                                 return TypedExpression(BuiltInType.int, expr)
                             case (BuiltInType.string, BuiltInType.string):
                                 return TypedExpression(BuiltInType.string, expr)
                             case _:
                                 self.errors.append(
-                                    f"Invalid operation: {left_type.type.name} + {right_type.type.name}")
+                                    f"Invalid operation: {l_typ.type.name} + {r_typ.type.name}")
                     case "-":
-                        match (left_type.type, right_type.type):
+                        match (l_typ.type, r_typ.type):
                             case (BuiltInType.int, BuiltInType.int):
                                 return TypedExpression(BuiltInType.int, expr)
                             case _:
                                 self.errors.append(
-                                    f"Invalid operation: {left_type.type.name} - {right_type.type.name}")
+                                    f"Invalid operation: {l_typ.type.name} - {r_typ.type.name}")
                                 return TypedExpression(BuiltInType.invalid, expr)
             case MultiplicationExpression(left, sign, right) as expr:
-                left_type = self.evaluate_type_expression(left, scope)
-                right_type = self.evaluate_type_expression(right, scope)
-                match (left_type.type, right_type.type):
+                l_typ, r_typ = self.lr_evaluate(left, right, scope)
+                match (l_typ.type, r_typ.type):
                     case (BuiltInType.int, BuiltInType.int):
                         return TypedExpression(BuiltInType.int, expr)
                     case _:
                         self.errors.append(
-                            f"Invalid operation: {left_type.type.name} {sign} {right_type.type.name}")
+                            f"Invalid operation: {l_typ.type.name} {sign} {r_typ.type.name}")
                         return TypedExpression(BuiltInType.invalid, expr)
             case ExponentiationExpression(left, sign, right) as expr:
-                left_type = self.evaluate_type_expression(left, scope)
-                right_type = self.evaluate_type_expression(right, scope)
-                match (left_type.type, right_type.type):
+                l_typ, r_typ = self.lr_evaluate(left, right, scope)
+                match (l_typ.type, r_typ.type):
                     case (BuiltInType.int, BuiltInType.int):
                         return TypedExpression(BuiltInType.int, expr)
                     case _:
                         self.errors.append(
-                            f"Invalid operation: {left_type.type} {sign} {right_type.type}"
+                            f"Invalid operation: {l_typ.type} {sign} {r_typ.type}"
                         )
                         return TypedExpression(BuiltInType.invalid, expr)
             case NegationExpression(expression) as expr:
-                body_typ = self.evaluate_type_expression(expression, scope)
-                match body_typ.type:
+                typ = self.evaluate_type_expression(expression, scope)
+                match typ.type:
                     case BuiltInType.int:
                         return TypedExpression(BuiltInType.int, expr)
                     case _:
                         self.errors.append(
-                            f"Invalid operation: -{body_typ.type}"
+                            f"Invalid operation: -{typ.type}"
                         )
                         return TypedExpression(BuiltInType.invalid, expr)
             case IfExpression(condition, body, else_ifs, else_body) as expr:
