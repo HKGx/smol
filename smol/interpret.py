@@ -1,4 +1,4 @@
-from typing import Any, Optional
+from typing import Any
 from collections.abc import Iterable
 from smol.checker import Scope
 from smol.parser import (AdditionExpression, ArrayExpression, AssignmentStatement, BlockExpression, BreakExpression,

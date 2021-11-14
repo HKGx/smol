@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from enum import Enum
 from os import name
-from typing import Optional, TypeVar, TypedDict
+from smol.utils import Scope
 from smol.parser import AdditionExpression, ArrayExpression, AssignmentStatement, ExponentiationExpression, Expression, ExpressionStatement, ForStatement, IdentifierExpression, IntegerExpression, MultiplicationExpression, Program, Statement, StringExpression
 
 
