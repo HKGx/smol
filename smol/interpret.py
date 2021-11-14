@@ -22,6 +22,8 @@ class BreakException(Exception):
 class ContinueException(Exception):
     pass
 
+# TODO: Add support for types inherited from checker
+
 
 class Interpreter:
     program: Program
