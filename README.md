@@ -10,7 +10,7 @@ print("Hello, World!")
 ```
 ## 99 Bottles of Beer
 ```fs
-for bottles in range(100, 1, -1) do 
+for bottles in 100..1..-1 do 
     print(str(bottles) + " bottles of bear on the wall, " + str(bottles) + " bottles of beer")
     let plural = 
         if bottles = 2:
