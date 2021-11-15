@@ -1,0 +1,3 @@
+fn foo() none: bar()
+foo()
+fn bar() none: print("none")
