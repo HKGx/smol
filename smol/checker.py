@@ -95,6 +95,7 @@ class Checker:
             case BuiltInTypeExpression("int"): return BuiltInType.int
             case BuiltInTypeExpression("string"): return BuiltInType.string
             case BuiltInTypeExpression("bool"): return BuiltInType.bool
+            case BuiltInTypeExpression("none"): return BuiltInType.none
             case TypeDeduceExpression(): return None
         raise NotImplementedError(
             f"Unsupported type expression: {t_expression}")

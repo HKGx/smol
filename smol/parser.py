@@ -126,7 +126,7 @@ class TypeDeduceExpression(TypeExpression):
 
 @dataclass
 class BuiltInTypeExpression(TypeExpression):
-    name: Literal["int"] | Literal["string"] | Literal["bool"]
+    name: Literal["int"] | Literal["string"] | Literal["bool"] | Literal["none"]
 
 
 @dataclass
@@ -208,8 +208,8 @@ class Parser:
     def type_atomic(self) -> TypeExpression:
         expr: TypeExpression
         match self.current_token:
-            case Token(TokenType.IDENTIFIER_LITERAL, "int" | "string" | "bool"):
-                assert self.current_token.image == "int" or self.current_token.image == "string" or self.current_token.image == "bool"
+            case Token(TokenType.IDENTIFIER_LITERAL, "int" | "string" | "bool" | "none"):
+                assert self.current_token.image == "int" or self.current_token.image == "string" or self.current_token.image == "bool" or self.current_token.image == "none"
                 expr = BuiltInTypeExpression(self.current_token.image)
             case _:
                 assert False, "Unexpected token"
