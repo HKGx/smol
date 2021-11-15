@@ -110,9 +110,25 @@ class ExpressionStatement(Statement):
 
 
 @dataclass
+class TypeExpression(Expression):
+    pass
+
+
+@dataclass
+class TypeDeduceExpression(TypeExpression):
+    pass
+
+
+@dataclass
+class TypeIdentifierExpression(TypeExpression):
+    name: str
+
+
+@dataclass
 class AssignmentStatement(Statement):
     name: IdentifierExpression
     value: Expression
+    type: TypeExpression
     mutable: bool
 
 
@@ -131,6 +147,7 @@ class ForStatement(Statement):
 
 @dataclass
 class FunctionArgument(IdentifierExpression):
+    type: TypeExpression
     mutable: bool
 
 
@@ -139,6 +156,7 @@ class FunctionDefinitionStatement(Statement):
     name: IdentifierExpression
     args: list[FunctionArgument]
     body: Expression
+    return_type: TypeExpression
 
 
 @dataclass
@@ -173,6 +191,19 @@ class Parser:
 
     def next(self, increment: int = 1):
         self.current += increment
+
+    def type_expression(self) -> TypeExpression:
+        return self.type_atomic()
+
+    def type_atomic(self) -> TypeExpression:
+        expr: TypeExpression
+        match self.current_token:
+            case Token(TokenType.IDENTIFIER_LITERAL, image):
+                expr = TypeIdentifierExpression(image)
+            case _:
+                assert False, "Unexpected token"
+        self.next()
+        return expr
 
     def expression(self) -> Expression:
         return self.equality()
@@ -409,12 +440,18 @@ class Parser:
         assert self.current_token.type == TokenType.IDENTIFIER_LITERAL, "Expected identifier after `let` but found `{self.current_token.image}`"
         identifier = IdentifierExpression(self.current_token.image)
         self.next()
+        typ = TypeDeduceExpression()
+        if self.current_token.type == TokenType.COLON:
+            self.next()
+            assert not self.ended, "Expected type after `:` but found `EOF`"
+            typ = self.type_expression()
+
         assert not self.ended, "Expected `=` but found `EOF`"
-        assert self.current_token.type == TokenType.EQUALS
+        assert self.current_token.type == TokenType.EQUALS, "Expected `=`"
         self.next()
         assert not self.ended, "Expected expression after `=` but found `EOF`"
         value = self.expression()
-        return AssignmentStatement(identifier, value, is_mutable)
+        return AssignmentStatement(identifier, value, typ, is_mutable)
 
     def function_definition_statement(self) -> Statement:
         assert self.current_token.type == TokenType.KEYWORD
@@ -438,15 +475,25 @@ class Parser:
                     is_mutable = True
                     self.next()
                 assert not self.ended, "Expected identifier but found `EOF`"
-                assert self.current_token.type == TokenType.IDENTIFIER_LITERAL, "Expected identifier but found `{self.current_token.image}`"
-                arg = FunctionArgument(self.current_token.image, is_mutable)
+                assert self.current_token.type == TokenType.IDENTIFIER_LITERAL, f"Expected identifier but found `{self.current_token.image}`"
+                image = self.current_token.image
+                self.next()
+                assert not self.ended, "Expected `:` but found `EOF`"
+                assert self.current_token.type == TokenType.COLON, "Expected `:`"
+                self.next()
+                assert not self.ended, "Expected type but found `EOF`"
+                typ = self.type_expression()
+                print(f"{self.current_token}")
+                assert not self.ended, "Expected `)` but found `EOF`"
+                arg = FunctionArgument(image, typ, is_mutable)
                 args.append(arg)
-            self.next()
         assert self.current_token.type == TokenType.RIGHT_PAREN, "Expected ')', unterminated function definition"
         self.next()
+        assert not self.ended, "Expected type but found `EOF`"
+        typ = self.type_expression()
         assert not self.ended, "Expected `:` or `do` but found `EOF`"
         body = self.enter_body()
-        return FunctionDefinitionStatement(identifier, args, body)
+        return FunctionDefinitionStatement(identifier, args, body, typ)
 
     def statement(self) -> Statement:
         match(self.current_token):
