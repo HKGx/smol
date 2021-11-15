@@ -21,6 +21,11 @@ class IdentifierExpression(Expression):
 
 
 @dataclass
+class BooleanExpression(Expression):
+    value: bool
+
+
+@dataclass
 class StringExpression(Expression):
     value: str
 
@@ -120,6 +125,11 @@ class TypeDeduceExpression(TypeExpression):
 
 
 @dataclass
+class BuiltInTypeExpression(TypeExpression):
+    name: Literal["int"] | Literal["string"] | Literal["bool"]
+
+
+@dataclass
 class TypeIdentifierExpression(TypeExpression):
     name: str
 
@@ -198,8 +208,9 @@ class Parser:
     def type_atomic(self) -> TypeExpression:
         expr: TypeExpression
         match self.current_token:
-            case Token(TokenType.IDENTIFIER_LITERAL, image):
-                expr = TypeIdentifierExpression(image)
+            case Token(TokenType.IDENTIFIER_LITERAL, "int" | "string" | "bool"):
+                assert self.current_token.image == "int" or self.current_token.image == "string" or self.current_token.image == "bool"
+                expr = BuiltInTypeExpression(self.current_token.image)
             case _:
                 assert False, "Unexpected token"
         self.next()
@@ -296,6 +307,8 @@ class Parser:
                 expr = self.if_expression()
             case Token(TokenType.INTEGER_LITERAL):
                 expr = IntegerExpression(int(self.current_token.image))
+            case Token(TokenType.BOOLEAN_LITERAL, image):
+                expr = BooleanExpression(image == "true")
             case Token(TokenType.LEFT_BRACKET):
                 expr = self.array_literal()
             case Token(TokenType.LEFT_PAREN):
