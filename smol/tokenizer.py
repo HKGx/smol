@@ -65,7 +65,7 @@ class Token:
 
 
 KEYWORDS = {"if", "else", "mut", "let", "do", "end",
-            "while", "for", "in", "break", "continue"}
+            "while", "for", "in", "break", "continue", "fn"}
 
 
 class Tokenizer:
