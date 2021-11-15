@@ -30,6 +30,7 @@ class TokenType(Enum):
     NOT_EQUALS = "!="
     SMALLER_OR_EQUAL_THAN = "<="
     GREATER_OR_EQUAL_THAN = ">="
+    RANGE = ".."
     # Literal tokens
 
     INTEGER_LITERAL = auto()
@@ -211,6 +212,15 @@ class Tokenizer:
                 self.skip_comment()
             elif self.current_character == '"':
                 self._tokens.append(self.string_literal())
+            elif self.current_character == "." and self.peek == ".":
+                self.increment()
+                self.increment()
+                self._tokens.append(Token(
+                    type=TokenType.RANGE,
+                    image="..",
+                    line=self.current_line,
+                    column=self.current_column - 2,
+                ))
             elif self.current_character in TokenType.first_characters():
                 match (self.current_character, self.peek):
                     case (">" | "<" | "!", "="):
