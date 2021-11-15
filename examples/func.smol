@@ -1,0 +1,3 @@
+fn double(n): 2 * n
+
+double(3)
