@@ -130,6 +130,18 @@ class ForStatement(Statement):
 
 
 @dataclass
+class FunctionArgument(IdentifierExpression):
+    mutable: bool
+
+
+@dataclass
+class FunctionDefinitionStatement(Statement):
+    name: IdentifierExpression
+    args: list[FunctionArgument]
+    body: Expression
+
+
+@dataclass
 class Program:
     statements: list[Statement]
 
@@ -404,8 +416,42 @@ class Parser:
         value = self.expression()
         return AssignmentStatement(identifier, value, is_mutable)
 
+    def function_definition_statement(self) -> Statement:
+        assert self.current_token.type == TokenType.KEYWORD
+        assert self.current_token.image == "fn"
+        self.next()
+        assert not self.ended, "Expected identifier after `fn` but found `EOF`"
+        assert self.current_token.type == TokenType.IDENTIFIER_LITERAL, "Expected identifier after `fn` but found `{self.current_token.image}`"
+        identifier = IdentifierExpression(self.current_token.image)
+        self.next()
+        assert not self.ended, "Expected `(` but found `EOF`"
+        assert self.current_token.type == TokenType.LEFT_PAREN, "Expected '('"
+        self.next()
+        # parse arguments
+        args: list[FunctionArgument] = []
+        while not self.ended:
+            if self.current_token.type == TokenType.RIGHT_PAREN:
+                break
+            if self.current_token.type != TokenType.COMMA:
+                is_mutable = False
+                if self.current_token.type == TokenType.KEYWORD and self.current_token.image == "mut":
+                    is_mutable = True
+                    self.next()
+                assert not self.ended, "Expected identifier but found `EOF`"
+                assert self.current_token.type == TokenType.IDENTIFIER_LITERAL, "Expected identifier but found `{self.current_token.image}`"
+                arg = FunctionArgument(self.current_token.image, is_mutable)
+                args.append(arg)
+            self.next()
+        assert self.current_token.type == TokenType.RIGHT_PAREN, "Expected ')', unterminated function definition"
+        self.next()
+        assert not self.ended, "Expected `:` or `do` but found `EOF`"
+        body = self.enter_body()
+        return FunctionDefinitionStatement(identifier, args, body)
+
     def statement(self) -> Statement:
         match(self.current_token):
+            case Token(TokenType.KEYWORD, "fn"):
+                return self.function_definition_statement()
             case Token(TokenType.KEYWORD, "let" | "mut"):
                 return self.assignment_statement()
             case Token(TokenType.KEYWORD, "for"):
