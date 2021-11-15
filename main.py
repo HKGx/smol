@@ -11,7 +11,7 @@ from smol.parser import (AdditionExpression, ArrayExpression,
                          FunctionCallExpression, FunctionDefinitionStatement, IdentifierExpression,
                          IfExpression, IntegerExpression,
                          MultiplicationExpression, NegationExpression, Parser,
-                         Program, Statement, StringExpression, WhileStatement)
+                         Program, RangeExpression, Statement, StringExpression, WhileStatement)
 from smol.tokenizer import Tokenizer
 
 
@@ -69,6 +69,9 @@ def stringify(expression: Expression, indent: int = 0) -> str:
             return f"{main_branch}\n{elif_branches}\n{else_branch}"
         case ArrayExpression(values):
             return f"[{', '.join(stringify(value) for value in values)}]"
+        case RangeExpression(start, end, step):
+            step_ = f"..{stringify(step)}" if step != 1 else ''
+            return f"{stringify(start)}..{stringify(end)}" + step_
         case BreakExpression():
             return "\t" * indent + "break"
         case ContinueExpression():
