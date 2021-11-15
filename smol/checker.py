@@ -14,31 +14,31 @@ from smol.parser import (AdditionExpression, ArrayExpression,
 from smol.utils import Scope
 
 
-@dataclass
+@dataclass(eq=True, frozen=True)
 class CheckerType:
     name: str
     meta: dict[str, bool] = dataclasses.field(
         init=False, default_factory=dict, compare=False)
 
 
-@dataclass(eq=True)
+@dataclass(eq=True, frozen=True)
 class InvalidType(CheckerType):
     name = "invalid"
 
 
-@dataclass
+@dataclass(eq=True, frozen=True)
 class ListType(CheckerType):
     type: CheckerType
     known_length: Optional[int]
 
 
-@dataclass
+@dataclass(eq=True, frozen=True)
 class MappingType(CheckerType):
     from_type: CheckerType
     to_type: CheckerType
 
 
-@dataclass
+@dataclass(eq=True, frozen=True)
 class TypedExpression:
     type: CheckerType
     value: Expression
@@ -48,14 +48,6 @@ class TypedExpression:
 class TypedStatement:
     type: CheckerType
     value: Statement
-
-
-class UnknownIdentifier(Exception):
-    pass
-
-
-class InvalidOperation(Exception):
-    pass
 
 
 class BuiltInType(NamedTuple):
@@ -278,7 +270,7 @@ class Checker:
         if not scope.rec_contains(ident_name):
             typ = self.evaluate_type_expression(expr, scope)
             if statement.mutable:
-                new_typ = dataclasses.replace(typ.type)
+                new_typ = dataclasses.replace(typ.type)  # copy type
                 new_typ.meta["mut"] = True
                 scope.rec_set(ident_name, new_typ)
             else:
