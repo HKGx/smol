@@ -9,7 +9,7 @@ from smol.parser import (AdditionExpression, ArrayExpression,
                          ExpressionStatement, ForStatement,
                          FunctionCallExpression, FunctionDefinitionStatement, IdentifierExpression,
                          IfExpression, IntegerExpression,
-                         MultiplicationExpression, NegationExpression, Program,
+                         MultiplicationExpression, NegationExpression, Program, RangeExpression,
                          Statement, StringExpression, TypeDeduceExpression, TypeExpression, WhileStatement)
 from smol.utils import Scope
 
@@ -272,6 +272,15 @@ class Checker:
                 if stat_type == BuiltInType.none:
                     return TypedExpression(BuiltInType.none, expr)
                 return TypedExpression(stat_type, expr)
+            case RangeExpression(start, end, step) as expr:
+                start_type = self.evaluate_type_expression(start, scope)
+                end_type = self.evaluate_type_expression(end, scope)
+                step_type = self.evaluate_type_expression(step, scope)
+                if start_type.type != BuiltInType.int or end_type.type != BuiltInType.int or step_type.type != BuiltInType.int:
+                    self.errors.append(
+                        f"Invalid range: {start_type.type} to {end_type.type} by {step_type.type}")
+                    return TypedExpression(BuiltInType.invalid, expr)
+                return TypedExpression(ListType("list", BuiltInType.int, None), expr)
 
         self.errors.append(f"Unknown expression: {expression}")
         return TypedExpression(BuiltInType.invalid, expression)
