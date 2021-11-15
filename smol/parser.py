@@ -21,6 +21,11 @@ class IdentifierExpression(Expression):
 
 
 @dataclass
+class BooleanExpression(Expression):
+    value: bool
+
+
+@dataclass
 class StringExpression(Expression):
     value: str
 
@@ -110,9 +115,30 @@ class ExpressionStatement(Statement):
 
 
 @dataclass
+class TypeExpression(Expression):
+    pass
+
+
+@dataclass
+class TypeDeduceExpression(TypeExpression):
+    pass
+
+
+@dataclass
+class BuiltInTypeExpression(TypeExpression):
+    name: Literal["int"] | Literal["string"] | Literal["bool"] | Literal["none"]
+
+
+@dataclass
+class TypeIdentifierExpression(TypeExpression):
+    name: str
+
+
+@dataclass
 class AssignmentStatement(Statement):
     name: IdentifierExpression
     value: Expression
+    type: TypeExpression
     mutable: bool
 
 
@@ -127,6 +153,20 @@ class ForStatement(Statement):
     ident: IdentifierExpression
     value: Expression
     body: Expression
+
+
+@dataclass
+class FunctionArgument(IdentifierExpression):
+    type: TypeExpression
+    mutable: bool
+
+
+@dataclass
+class FunctionDefinitionStatement(Statement):
+    name: IdentifierExpression
+    args: list[FunctionArgument]
+    body: Expression
+    return_type: TypeExpression
 
 
 @dataclass
@@ -161,6 +201,20 @@ class Parser:
 
     def next(self, increment: int = 1):
         self.current += increment
+
+    def type_expression(self) -> TypeExpression:
+        return self.type_atomic()
+
+    def type_atomic(self) -> TypeExpression:
+        expr: TypeExpression
+        match self.current_token:
+            case Token(TokenType.IDENTIFIER_LITERAL, "int" | "string" | "bool" | "none"):
+                assert self.current_token.image == "int" or self.current_token.image == "string" or self.current_token.image == "bool" or self.current_token.image == "none"
+                expr = BuiltInTypeExpression(self.current_token.image)
+            case _:
+                assert False, "Unexpected token"
+        self.next()
+        return expr
 
     def expression(self) -> Expression:
         return self.equality()
@@ -253,6 +307,8 @@ class Parser:
                 expr = self.if_expression()
             case Token(TokenType.INTEGER_LITERAL):
                 expr = IntegerExpression(int(self.current_token.image))
+            case Token(TokenType.BOOLEAN_LITERAL, image):
+                expr = BooleanExpression(image == "true")
             case Token(TokenType.LEFT_BRACKET):
                 expr = self.array_literal()
             case Token(TokenType.LEFT_PAREN):
@@ -397,15 +453,65 @@ class Parser:
         assert self.current_token.type == TokenType.IDENTIFIER_LITERAL, "Expected identifier after `let` but found `{self.current_token.image}`"
         identifier = IdentifierExpression(self.current_token.image)
         self.next()
+        typ = TypeDeduceExpression()
+        if self.current_token.type == TokenType.COLON:
+            self.next()
+            assert not self.ended, "Expected type after `:` but found `EOF`"
+            typ = self.type_expression()
+
         assert not self.ended, "Expected `=` but found `EOF`"
-        assert self.current_token.type == TokenType.EQUALS
+        assert self.current_token.type == TokenType.EQUALS, "Expected `=`"
         self.next()
         assert not self.ended, "Expected expression after `=` but found `EOF`"
         value = self.expression()
-        return AssignmentStatement(identifier, value, is_mutable)
+        return AssignmentStatement(identifier, value, typ, is_mutable)
+
+    def function_definition_statement(self) -> Statement:
+        assert self.current_token.type == TokenType.KEYWORD
+        assert self.current_token.image == "fn"
+        self.next()
+        assert not self.ended, "Expected identifier after `fn` but found `EOF`"
+        assert self.current_token.type == TokenType.IDENTIFIER_LITERAL, "Expected identifier after `fn` but found `{self.current_token.image}`"
+        identifier = IdentifierExpression(self.current_token.image)
+        self.next()
+        assert not self.ended, "Expected `(` but found `EOF`"
+        assert self.current_token.type == TokenType.LEFT_PAREN, "Expected '('"
+        self.next()
+        # parse arguments
+        args: list[FunctionArgument] = []
+        while not self.ended:
+            if self.current_token.type == TokenType.RIGHT_PAREN:
+                break
+            if self.current_token.type != TokenType.COMMA:
+                is_mutable = False
+                if self.current_token.type == TokenType.KEYWORD and self.current_token.image == "mut":
+                    is_mutable = True
+                    self.next()
+                assert not self.ended, "Expected identifier but found `EOF`"
+                assert self.current_token.type == TokenType.IDENTIFIER_LITERAL, f"Expected identifier but found `{self.current_token.image}`"
+                image = self.current_token.image
+                self.next()
+                assert not self.ended, "Expected `:` but found `EOF`"
+                assert self.current_token.type == TokenType.COLON, "Expected `:`"
+                self.next()
+                assert not self.ended, "Expected type but found `EOF`"
+                typ = self.type_expression()
+                print(f"{self.current_token}")
+                assert not self.ended, "Expected `)` but found `EOF`"
+                arg = FunctionArgument(image, typ, is_mutable)
+                args.append(arg)
+        assert self.current_token.type == TokenType.RIGHT_PAREN, "Expected ')', unterminated function definition"
+        self.next()
+        assert not self.ended, "Expected type but found `EOF`"
+        typ = self.type_expression()
+        assert not self.ended, "Expected `:` or `do` but found `EOF`"
+        body = self.enter_body()
+        return FunctionDefinitionStatement(identifier, args, body, typ)
 
     def statement(self) -> Statement:
         match(self.current_token):
+            case Token(TokenType.KEYWORD, "fn"):
+                return self.function_definition_statement()
             case Token(TokenType.KEYWORD, "let" | "mut"):
                 return self.assignment_statement()
             case Token(TokenType.KEYWORD, "for"):

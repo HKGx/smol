@@ -31,11 +31,13 @@ class TokenType(Enum):
     SMALLER_OR_EQUAL_THAN = "<="
     GREATER_OR_EQUAL_THAN = ">="
     # Literal tokens
+
     INTEGER_LITERAL = auto()
     FLOAT_LITERAL = auto()
     STRING_LITERAL = auto()
-    KEYWORD = auto()
     IDENTIFIER_LITERAL = auto()
+    BOOLEAN_LITERAL = auto()
+    KEYWORD = auto()
 
     @staticmethod
     @lru_cache
@@ -65,7 +67,7 @@ class Token:
 
 
 KEYWORDS = {"if", "else", "mut", "let", "do", "end",
-            "while", "for", "in", "break", "continue"}
+            "while", "for", "in", "break", "continue", "fn"}
 
 
 class Tokenizer:
@@ -113,6 +115,15 @@ class Tokenizer:
             else:
                 self.current_column += 1
             self.current_source_idx += 1
+
+    def skip_comment(self):
+        """
+        Skips comments in source
+        """
+        assert self.current_character == "#"
+        self.increment()
+        while not self.ended and self.current_character != "\n":
+            self.increment()
 
     def integer_literal(self) -> Token:
         """
@@ -172,11 +183,13 @@ class Tokenizer:
                     or self.current_character == "_")):
             self.increment()
         image = self.source[start: self.current_source_idx]
-
+        typ: TokenType = TokenType.IDENTIFIER_LITERAL
+        if image in KEYWORDS:
+            typ = TokenType.KEYWORD
+        if image in ("true", "false"):
+            typ = TokenType.BOOLEAN_LITERAL
         return Token(
-            type=TokenType.KEYWORD
-            if image in KEYWORDS
-            else TokenType.IDENTIFIER_LITERAL,
+            type=typ,
             image=image,
             line=self.current_line,
             column=self.current_column - len(image),
@@ -194,7 +207,9 @@ class Tokenizer:
             self.skip_whitespace()
             if self.ended:
                 break
-            if self.current_character == '"':
+            if self.current_character == "#":
+                self.skip_comment()
+            elif self.current_character == '"':
                 self._tokens.append(self.string_literal())
             elif self.current_character in TokenType.first_characters():
                 match (self.current_character, self.peek):

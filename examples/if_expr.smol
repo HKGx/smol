@@ -1,7 +1,7 @@
-if 1 = 1 do
+if true do
     print(str(1))
     print(str(2))
     print(str(3))
     4
 end
-
+else if false: 0

@@ -4,11 +4,11 @@ from pprint import pprint
 from smol.checker import Checker
 from smol.interpret import Interpreter
 from smol.parser import (AdditionExpression, ArrayExpression,
-                         AssignmentStatement, BlockExpression, BreakExpression,
+                         AssignmentStatement, BlockExpression, BooleanExpression, BreakExpression,
                          ComparisonExpression, ContinueExpression,
                          EqualityExpression, ExponentiationExpression,
                          Expression, ExpressionStatement, ForStatement,
-                         FunctionCallExpression, IdentifierExpression,
+                         FunctionCallExpression, FunctionDefinitionStatement, IdentifierExpression,
                          IfExpression, IntegerExpression,
                          MultiplicationExpression, NegationExpression, Parser,
                          Program, Statement, StringExpression, WhileStatement)
@@ -29,6 +29,8 @@ def statement(stmt: Statement, indent: int = 0) -> str:
             return f"for {stringify(ident)} in {stringify(expr)} do \n{stringify(body, indent + 1)}\nend"
         case WhileStatement(condition, body):
             return f"while {stringify(condition)} do \n{stringify(body, indent + 1)}\nend"
+        case FunctionDefinitionStatement(name, args, body):
+            return f"fn {stringify(name)}({', '.join(stringify(arg) for arg in args)}):\n{stringify(body, indent + 1)}"
 
     raise Exception(f"Unexpected statement: {stmt}")
 
@@ -42,6 +44,8 @@ def stringify(expression: Expression, indent: int = 0) -> str:
             return "\t" * indent + str(value)
         case StringExpression(value):
             return "\t" * indent + f'"{value}"'
+        case BooleanExpression(value):
+            return "\t" * indent + str(value)
         case AdditionExpression(lhs, sign, rhs):
             return "\t" * indent + f"({stringify(lhs)} {sign} {stringify(rhs)})"
         case MultiplicationExpression(lhs, sign, rhs):
@@ -95,14 +99,18 @@ def check_file(file: TextIOWrapper, debug: bool = False):
         print("No errors found")
 
 
-def interpret_file(file: TextIOWrapper, debug: bool = False):
+def interpret_file(file: TextIOWrapper, debug: bool = False, no_checker: bool = False):
     tokens = Tokenizer(file.read()).tokenize()
     if debug:
         pprint(tokens)
     prog = Parser(tokens).program()
     if debug:
         pprint(prog)
-    pprint(program(prog))
+    print(program(prog))
+    if no_checker:
+        interpreter = Interpreter(prog)
+        pprint(interpreter.run())
+        return
     checker = Checker(prog)
     for error in checker.check():
         print(error)
@@ -148,6 +156,7 @@ if __name__ == "__main__":
     parser.add_argument('file', nargs='?',
                         help='File to interpret', type=open)
     parser.add_argument("--debug", "-d", action="store_true")
+    parser.add_argument("--no-checker", action="store_true")
     parsed_args = parser.parse_args()
     match (parsed_args.file, parsed_args.run_type):
         case (None, 'repl' | "r"):
@@ -155,7 +164,8 @@ if __name__ == "__main__":
         case (None, _):
             print("No file specified")
         case (_, "interpret" | "i"):
-            interpret_file(parsed_args.file, parsed_args.debug)
+            interpret_file(parsed_args.file, parsed_args.debug,
+                           parsed_args.no_checker)
         case (_, "compile" | "c"):
             compile_file(parsed_args.file, parsed_args.debug)
         case (_, "check"):
