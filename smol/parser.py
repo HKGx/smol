@@ -36,6 +36,13 @@ class ArrayExpression(Expression):
 
 
 @dataclass
+class RangeExpression(Expression):
+    left: Expression
+    right: Expression
+    step: Expression
+
+
+@dataclass
 class EqualityExpression(Expression):
     left: Expression
     sign: Literal['='] | Literal['!=']
@@ -229,7 +236,7 @@ class Parser:
         return lhs
 
     def comparison(self) -> Expression:
-        lhs = self.addition()
+        lhs = self.range_expression()
         while (not self.ended and self.current_token.match(
             TokenType.SMALLER_THAN,
             TokenType.GREATER_THAN,
@@ -242,7 +249,22 @@ class Parser:
                     or self.current_token.image == ">=")
             sign: Literal["<", ">", "<=", ">="] = self.current_token.image
             self.next()
-            lhs = ComparisonExpression(lhs, sign, self.addition())
+            lhs = ComparisonExpression(lhs, sign, self.range_expression())
+        return lhs
+
+    def range_expression(self) -> Expression:
+        lhs = self.addition()
+        if (not self.ended and self.current_token.match(TokenType.RANGE)):
+            assert self.current_token.image == ".."
+            self.next()
+            assert not self.ended, "Expected expression after '..'"
+            rhs = self.addition()
+            if (not self.ended and self.current_token.match(TokenType.RANGE)):
+                assert self.current_token.image == ".."
+                self.next()
+                assert not self.ended, "Expected expression after '..'"
+                return RangeExpression(lhs, rhs, self.addition())
+            return RangeExpression(lhs, rhs, IntegerExpression(1))
         return lhs
 
     def addition(self) -> Expression:
