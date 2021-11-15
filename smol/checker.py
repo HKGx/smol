@@ -7,7 +7,7 @@ from smol.parser import (AdditionExpression, ArrayExpression,
                          ComparisonExpression, EqualityExpression,
                          ExponentiationExpression, Expression,
                          ExpressionStatement, ForStatement,
-                         FunctionCallExpression, IdentifierExpression,
+                         FunctionCallExpression, FunctionDefinitionStatement, IdentifierExpression,
                          IfExpression, IntegerExpression,
                          MultiplicationExpression, NegationExpression, Program,
                          Statement, StringExpression, WhileStatement)
@@ -349,4 +349,14 @@ class Checker:
                 return self.check_for_statement(statement, scope)
             case WhileStatement():
                 return self.check_while_statement(statement, scope)
-        return TypedStatement(BuiltInType.invalid, statement)
+            case FunctionDefinitionStatement(name, args, body):
+                # TODO: blocked by upstream, need to implement typings
+                if scope.rec_contains(name.name):
+                    self.errors.append(
+                        f"Invalid function definition: {name} is already defined")
+                    return TypedStatement(BuiltInType.invalid, statement)
+                scope.rec_set(name.name, MappingType(
+                    "function", BuiltInType.int, BuiltInType.int))
+                return TypedStatement(BuiltInType.none, statement)
+
+        raise NotImplementedError(f"Unknown statement: {statement}")

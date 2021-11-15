@@ -6,7 +6,7 @@ from smol.parser import (AdditionExpression, ArrayExpression,
                          ComparisonExpression, ContinueExpression,
                          EqualityExpression, ExponentiationExpression,
                          Expression, ExpressionStatement, ForStatement,
-                         FunctionCallExpression, IdentifierExpression,
+                         FunctionCallExpression, FunctionDefinitionStatement, IdentifierExpression,
                          IfExpression, IntegerExpression,
                          MultiplicationExpression, NegationExpression, Program,
                          Statement, StringExpression, WhileStatement)
@@ -108,13 +108,13 @@ class Interpreter:
                     name), f"Undefined identifier: {name}"
                 return scope.rec_get(name)
             case IfExpression(condition, then_block, else_ifs, else_block):
-                if self.evaluate(condition):
+                if self.evaluate(condition, scope):
                     return self.evaluate(then_block, scope)
                 for else_if in else_ifs:
                     if self.evaluate(else_if[0], scope):
-                        return self.evaluate(else_if[1])
+                        return self.evaluate(else_if[1], scope)
                 if else_block:
-                    return self.evaluate(else_block)
+                    return self.evaluate(else_block, scope)
             case BlockExpression(statements):
                 inner_scope = scope.spawn_child()
                 last: RETURN_TYPE | None = None
@@ -161,6 +161,13 @@ class Interpreter:
                         break
                     except ContinueException:
                         continue
+            case FunctionDefinitionStatement(ident, fn_args, body):
+                def fn(*args):
+                    inner_scope = scope.spawn_child()
+                    for arg, val in zip(fn_args, args):
+                        inner_scope.rec_set(arg.name, val)
+                    return self.evaluate(body, inner_scope)
+                scope.rec_set(ident.name, fn)
             case _:
                 raise NotImplementedError(
                     f"Unsupported statement: {statement}")

@@ -8,7 +8,7 @@ from smol.parser import (AdditionExpression, ArrayExpression,
                          ComparisonExpression, ContinueExpression,
                          EqualityExpression, ExponentiationExpression,
                          Expression, ExpressionStatement, ForStatement,
-                         FunctionCallExpression, IdentifierExpression,
+                         FunctionCallExpression, FunctionDefinitionStatement, IdentifierExpression,
                          IfExpression, IntegerExpression,
                          MultiplicationExpression, NegationExpression, Parser,
                          Program, Statement, StringExpression, WhileStatement)
@@ -29,6 +29,8 @@ def statement(stmt: Statement, indent: int = 0) -> str:
             return f"for {stringify(ident)} in {stringify(expr)} do \n{stringify(body, indent + 1)}\nend"
         case WhileStatement(condition, body):
             return f"while {stringify(condition)} do \n{stringify(body, indent + 1)}\nend"
+        case FunctionDefinitionStatement(name, args, body):
+            return f"fn {stringify(name)}({', '.join(stringify(arg) for arg in args)}):\n{stringify(body, indent + 1)}"
 
     raise Exception(f"Unexpected statement: {stmt}")
 
