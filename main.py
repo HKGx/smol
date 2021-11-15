@@ -102,7 +102,7 @@ def interpret_file(file: TextIOWrapper, debug: bool = False):
     prog = Parser(tokens).program()
     if debug:
         pprint(prog)
-    pprint(program(prog))
+    print(program(prog))
     checker = Checker(prog)
     for error in checker.check():
         print(error)
