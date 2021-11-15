@@ -1,5 +1,5 @@
 do
-    let foo = 2
-    print(foo)
+    let foo: int = 2
+    print(str(foo))
 end
 print(foo)
