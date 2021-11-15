@@ -2,7 +2,7 @@ from collections.abc import Iterable
 from typing import Any
 
 from smol.parser import (AdditionExpression, ArrayExpression,
-                         AssignmentStatement, BlockExpression, BreakExpression,
+                         AssignmentStatement, BlockExpression, BooleanExpression, BreakExpression,
                          ComparisonExpression, ContinueExpression,
                          EqualityExpression, ExponentiationExpression,
                          Expression, ExpressionStatement, ForStatement,
@@ -51,7 +51,7 @@ class Interpreter:
         if scope is None:
             scope = self.scope
         match expression:
-            case IntegerExpression(value):
+            case BooleanExpression(value) | IntegerExpression(value) | StringExpression(value):
                 return value
             case ExponentiationExpression(left, sign, right):
                 lhs, rhs = self.lr_evaluate(left, right, scope)
@@ -127,8 +127,6 @@ class Interpreter:
                 raise BreakException()
             case ContinueExpression():
                 raise ContinueException()
-            case StringExpression(value):
-                return value
             case _:
                 raise NotImplementedError(
                     f"Unsupported expression: {expression}")
