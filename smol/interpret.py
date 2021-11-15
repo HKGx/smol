@@ -8,7 +8,7 @@ from smol.parser import (AdditionExpression, ArrayExpression,
                          Expression, ExpressionStatement, ForStatement,
                          FunctionCallExpression, FunctionDefinitionStatement, IdentifierExpression,
                          IfExpression, IntegerExpression,
-                         MultiplicationExpression, NegationExpression, Program,
+                         MultiplicationExpression, NegationExpression, Program, RangeExpression,
                          Statement, StringExpression, WhileStatement)
 from smol.utils import Scope
 
@@ -123,6 +123,17 @@ class Interpreter:
                 return last
             case ArrayExpression(values):
                 return [self.evaluate(value, scope) for value in values]
+            case RangeExpression(start, end, step):
+                start_value = self.evaluate(start, scope)
+                end_value = self.evaluate(end, scope)
+                step_value = self.evaluate(step, scope)
+                assert isinstance(start_value, (int)
+                                  ), f"{start_value} is not a number"
+                assert isinstance(
+                    end_value, (int)), f"{end_value} is not a number"
+                assert isinstance(
+                    step_value, (int)), f"{step_value} is not a number"
+                return list(range(start_value, end_value, step_value))
             case BreakExpression():
                 raise BreakException()
             case ContinueExpression():
