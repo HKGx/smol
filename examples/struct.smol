@@ -1,0 +1,11 @@
+struct Foo
+    mut bar: int
+    baz: string
+end
+
+
+let a: Foo := Foo(bar := 1, baz := "xD")
+let b := Foo(baz := "dupa", bar := 2)
+let c := [a, b, 1]
+print(a.baz)
+print(b.baz)

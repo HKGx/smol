@@ -1,5 +1,5 @@
 from collections.abc import Iterable
-from typing import Any
+from typing import Any, Callable
 
 from smol.parser import (AdditionExpression, ArrayExpression,
                          AssignmentStatement, BlockExpression, BooleanExpression, BreakExpression,
@@ -8,11 +8,12 @@ from smol.parser import (AdditionExpression, ArrayExpression,
                          Expression, ExpressionStatement, ForStatement,
                          FunctionCallExpression, FunctionDefinitionStatement, IdentifierExpression,
                          IfExpression, IntegerExpression,
-                         MultiplicationExpression, NegationExpression, Program, RangeExpression,
-                         Statement, StringExpression, WhileStatement)
+                         MultiplicationExpression, NegationExpression, Program, PropertyAccessExpression, RangeExpression,
+                         Statement, StringExpression, StructDefinitionStatement, StructMember, WhileStatement)
 from smol.utils import Scope
 
-RETURN_TYPE = int | float | None | str | list["RETURN_TYPE"]
+
+RETURN_TYPE = int | float | None | str | list["RETURN_TYPE"] | dict[str, "RETURN_TYPE"]
 
 
 class BreakException(Exception):
@@ -29,12 +30,17 @@ class Interpreter:
     program: Program
     scope: Scope[Any] = Scope.from_dict({
         'print': print,
-        'range': range,
         'str': str
     })
 
     def __init__(self, program: Program):
         self.program = program
+
+    def struct(self, fields: list[StructMember]) -> Callable[..., dict[str, "RETURN_TYPE"]]:
+        def struct_fn(**kwargs):
+            return kwargs
+        struct_fn.__name__ = "__struct__"
+        return struct_fn
 
     def lr_evaluate(self,
                     lhs: Expression,
@@ -99,10 +105,24 @@ class Interpreter:
                 assert isinstance(value, (int, float)
                                   ), f"{value} is not a number"
                 return -1 * value
+            case PropertyAccessExpression(expression, property):
+                value = self.evaluate(expression, scope)
+                assert isinstance(value, dict), f"{value} is not a struct"
+                return value[property]
             case FunctionCallExpression(ident, args):
                 assert scope.rec_contains(
                     ident.name), f"Function {ident.name} not found"
-                return scope.rec_get(ident.name)(*[self.evaluate(arg, scope) for arg in args])
+                fun = scope.rec_get(ident.name)
+                assert isinstance(
+                    fun, Callable), f"{fun} is not callable, {ident.name}"
+                pos, kwd = [], {}
+                for arg in args:
+                    if arg.name is None:
+                        assert fun.__name__ != "__struct__", f"{fun} cannot be a struct"
+                        pos.append(self.evaluate(arg.value, scope))
+                    else:
+                        kwd[arg.name] = self.evaluate(arg.value, scope)
+                return fun(*pos, **kwd)
             case IdentifierExpression(name):
                 assert scope.rec_contains(
                     name), f"Undefined identifier: {name}"
@@ -170,13 +190,15 @@ class Interpreter:
                         break
                     except ContinueException:
                         continue
-            case FunctionDefinitionStatement(ident, fn_args, body):
+            case FunctionDefinitionStatement(name, fn_args, body):
                 def fn(*args):
                     inner_scope = scope.spawn_child()
                     for arg, val in zip(fn_args, args):
                         inner_scope.rec_set(arg.name, val)
                     return self.evaluate(body, inner_scope)
-                scope.rec_set(ident.name, fn)
+                scope.rec_set(name, fn)
+            case StructDefinitionStatement(name, fields):
+                scope.rec_set(name, self.struct(fields))
             case _:
                 raise NotImplementedError(
                     f"Unsupported statement: {statement}")

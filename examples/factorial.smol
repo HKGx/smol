@@ -1,16 +1,16 @@
 
 
 fn factorial(n: int) int do
-    mut let out = 1
+    mut let out := 1
     for v in 1..n+1 do
-        let out = out * v
+        let out := out * v
     end
     out
 end
 
 fn rec_factorial(n: int) int do
-    if n = 1: 1
-    else if n = 0: 1
+    if n == 1: 1
+    else if n == 0: 1
     else:
         n * rec_factorial(n-1)
 end

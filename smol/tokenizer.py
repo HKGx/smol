@@ -25,8 +25,10 @@ class TokenType(Enum):
 
     SMALLER_THAN = "<"
     GREATER_THAN = ">"
-    EQUALS = "="
+
     # Two or more character tokens and operators
+    DEFINE = ":="
+    EQUALS = "=="
     NOT_EQUALS = "!="
     SMALLER_OR_EQUAL_THAN = "<="
     GREATER_OR_EQUAL_THAN = ">="
@@ -68,7 +70,7 @@ class Token:
 
 
 KEYWORDS = {"if", "else", "mut", "let", "do", "end",
-            "while", "for", "in", "break", "continue", "fn"}
+            "while", "for", "in", "break", "continue", "fn", "struct"}
 
 
 class Tokenizer:
@@ -218,6 +220,24 @@ class Tokenizer:
                 self._tokens.append(Token(
                     type=TokenType.RANGE,
                     image="..",
+                    line=self.current_line,
+                    column=self.current_column - 2,
+                ))
+            elif self.current_character == ":" and self.peek == "=":
+                self.increment()
+                self.increment()
+                self._tokens.append(Token(
+                    type=TokenType.DEFINE,
+                    image=":=",
+                    line=self.current_line,
+                    column=self.current_column - 2,
+                ))
+            elif self.current_character == "=" and self.peek == "=":
+                self.increment()
+                self.increment()
+                self._tokens.append(Token(
+                    type=TokenType.EQUALS,
+                    image="==",
                     line=self.current_line,
                     column=self.current_column - 2,
                 ))

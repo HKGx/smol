@@ -1,3 +1,5 @@
 fn foo() none: bar()
 foo()
 fn bar() none: print("none")
+
+# TODO: make it work!
