@@ -4,6 +4,13 @@ from functools import lru_cache
 
 
 class TokenType(Enum):
+    # Two or more character tokens and operators
+    DEFINE = ":="
+    EQUALS = "=="
+    NOT_EQUALS = "!="
+    SMALLER_OR_EQUAL_THAN = "<="
+    GREATER_OR_EQUAL_THAN = ">="
+    RANGE = ".."
     # Single-character tokens and operators
     LEFT_PAREN = "("
     RIGHT_PAREN = ")"
@@ -22,17 +29,9 @@ class TokenType(Enum):
     CARET = "^"
     COLON = ":"
     SEMICOLON = ";"
-
     SMALLER_THAN = "<"
     GREATER_THAN = ">"
 
-    # Two or more character tokens and operators
-    DEFINE = ":="
-    EQUALS = "=="
-    NOT_EQUALS = "!="
-    SMALLER_OR_EQUAL_THAN = "<="
-    GREATER_OR_EQUAL_THAN = ">="
-    RANGE = ".."
     # Literal tokens
 
     INTEGER_LITERAL = auto()
@@ -214,36 +213,9 @@ class Tokenizer:
                 self.skip_comment()
             elif self.current_character == '"':
                 self._tokens.append(self.string_literal())
-            elif self.current_character == "." and self.peek == ".":
-                self.increment()
-                self.increment()
-                self._tokens.append(Token(
-                    type=TokenType.RANGE,
-                    image="..",
-                    line=self.current_line,
-                    column=self.current_column - 2,
-                ))
-            elif self.current_character == ":" and self.peek == "=":
-                self.increment()
-                self.increment()
-                self._tokens.append(Token(
-                    type=TokenType.DEFINE,
-                    image=":=",
-                    line=self.current_line,
-                    column=self.current_column - 2,
-                ))
-            elif self.current_character == "=" and self.peek == "=":
-                self.increment()
-                self.increment()
-                self._tokens.append(Token(
-                    type=TokenType.EQUALS,
-                    image="==",
-                    line=self.current_line,
-                    column=self.current_column - 2,
-                ))
             elif self.current_character in TokenType.first_characters():
                 match (self.current_character, self.peek):
-                    case (">" | "<" | "!", "="):
+                    case (">" | "<" | "!" | "=" | ":", "=") | (".", "."):
                         self._tokens.append(
                             Token(
                                 type=TokenType(
