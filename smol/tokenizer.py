@@ -245,3 +245,14 @@ class Tokenizer:
                 print(f"Unknown character {self.current_character}")
                 assert False, "other tokens not yet implemented"
         return self._tokens
+
+    @classmethod
+    def from_file(cls, filename: Union[TextIOWrapper, str, Path]) -> "Tokenizer":
+        """
+        Returns a Tokenizer instance from a file
+        """
+        if isinstance(filename, (str, Path)):
+            with open(filename, "r") as f:
+                return cls(f.read())
+        else:
+            return cls(filename.read())
