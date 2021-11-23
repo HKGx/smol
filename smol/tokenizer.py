@@ -1,6 +1,9 @@
 from dataclasses import dataclass
 from enum import Enum, auto
 from functools import lru_cache
+from io import TextIOWrapper
+from pathlib import Path
+from typing import Union
 
 
 class TokenType(Enum):
