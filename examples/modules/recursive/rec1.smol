@@ -1,0 +1,3 @@
+import rec2
+
+print("Hello World")

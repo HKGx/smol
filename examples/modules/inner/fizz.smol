@@ -1,0 +1,3 @@
+fn buzz() do 
+    print("buzz")
+end

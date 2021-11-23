@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from textwrap import dedent
-from typing import Callable, Literal, TypeVar
+from typing import Literal, TypeVar
 
 from smol.tokenizer import Token, TokenType, Tokenizer
 
@@ -96,7 +96,7 @@ class FunctionCallArgument:
 
 @dataclass
 class FunctionCallExpression(Expression):
-    name: IdentifierExpression
+    object: Expression  # object which is being called
     args: list[FunctionCallArgument]
 
 
@@ -202,6 +202,11 @@ class FunctionDefinitionStatement(Statement):
 
 
 @dataclass
+class ImportStatement(Statement):
+    name: str
+
+
+@dataclass
 class Program:
     statements: list[Statement]
 
@@ -211,7 +216,8 @@ RuleReturnType = TypeVar("RuleReturnType", Expression, Program, Statement)
 
 class Parser:
     """
-    Parsers tokens into an AST.
+    Parses tokens into an AST.
+    This can be then fed into Checker or Interpreter.
     """
     tokens: list[Token]
     current: int = 0
@@ -231,6 +237,7 @@ class Parser:
     @classmethod
     def from_file(cls, filename: str) -> "Parser":
         return cls.from_tokenizer(Tokenizer.from_file(filename))
+
     @property
     def current_token(self) -> Token:
         return self.tokens[self.current]
@@ -337,8 +344,32 @@ class Parser:
     def negation(self) -> Expression:
         if self.current_token.type == TokenType.MINUS:
             self.next()
-            return NegationExpression(self.property_access())
-        return self.property_access()
+            return NegationExpression(self.function_call())
+        return self.function_call()
+
+    def function_call(self) -> Expression:
+
+        object = self.property_access()
+        if self.ended or self.current_token.type != TokenType.LEFT_PAREN:
+            return object
+        assert not self.ended, "Expected `(` but found `EOF`"
+        assert self.current_token.type == TokenType.LEFT_PAREN, "Expected '('"
+        self.next()
+        # parse arguments
+        args: list[FunctionCallArgument] = []
+        while not self.ended:
+            match self.current_token:
+                case Token(TokenType.RIGHT_PAREN):
+                    break
+                case Token(TokenType.COMMA):
+                    self.next()
+                    continue
+                case _:
+                    args.append(self.function_call_argument())
+        assert not self.ended, "Expected `)` but found `EOF`"
+        assert self.current_token.type == TokenType.RIGHT_PAREN, "Expected ')'"
+        self.next()
+        return FunctionCallExpression(object, args)
 
     def property_access(self) -> Expression:
         lhs = self.atomic()
@@ -389,10 +420,7 @@ class Parser:
             case Token(TokenType.STRING_LITERAL):
                 expr = StringExpression(self.current_token.image)
             case Token(TokenType.IDENTIFIER_LITERAL):
-                if (self.peek_next and self.peek_next.type == TokenType.LEFT_PAREN):
-                    expr = self.function_call()
-                else:
-                    expr = IdentifierExpression(self.current_token.image)
+                expr = IdentifierExpression(self.current_token.image)
             case _:
                 # TODO: improve error reporting
                 start = max(0, self.current - 10)
@@ -461,7 +489,7 @@ class Parser:
         self.next()
         expr = self.expression()
         assert not self.ended, "Expected ')' but found 'EOF'"
-        assert self.current_token.type == TokenType.RIGHT_PAREN, "Expected ')'"
+        assert self.current_token.type == TokenType.RIGHT_PAREN, f"Expected ')' but found {self.current_token.image}"
         return expr
 
     def function_call_argument(self) -> FunctionCallArgument:
@@ -473,27 +501,6 @@ class Parser:
                 assert not self.ended, "Expected expression after `:=` but found `EOF`"
                 return FunctionCallArgument(name, value=self.expression())
         return FunctionCallArgument(None, self.expression())
-
-    def function_call(self) -> Expression:
-        assert self.current_token.type == TokenType.IDENTIFIER_LITERAL
-        name = IdentifierExpression(self.current_token.image)
-        self.next()
-        assert not self.ended, "Expected `(` but found `EOF`"
-        assert self.current_token.type == TokenType.LEFT_PAREN, "Expected '('"
-        self.next()
-        # parse arguments
-        args: list[FunctionCallArgument] = []
-        while not self.ended:
-            match self.current_token:
-                case Token(TokenType.RIGHT_PAREN):
-                    break
-                case Token(TokenType.COMMA):
-                    self.next()
-                    continue
-                case _:
-                    args.append(self.function_call_argument())
-        assert self.current_token.type == TokenType.RIGHT_PAREN, "Expected ')'"
-        return FunctionCallExpression(name, args)
 
     def expression_statement(self) -> Statement:
         return ExpressionStatement(self.expression())
@@ -550,6 +557,7 @@ class Parser:
         return AssignmentStatement(identifier, value, typ, is_mutable)
 
     def function_definition_statement(self) -> Statement:
+        # TODO: investigate whether this can be simplified
         assert self.current_token.type == TokenType.KEYWORD
         assert self.current_token.image == "fn"
         self.next()
@@ -595,7 +603,9 @@ class Parser:
         assert self.current_token.type == TokenType.RIGHT_PAREN, "Expected ')', unterminated function definition"
         self.next()
         assert not self.ended, "Expected type but found `EOF`"
-        typ = self.type_expression()
+        typ = TypeDeduceExpression()
+        if not self.current_token.match(TokenType.COLON, TokenType.KEYWORD):
+            typ = self.type_expression()
         assert not self.ended, "Expected `:` or `do` but found `EOF`"
         body = self.enter_body()
         return FunctionDefinitionStatement(name, args, body, typ)
@@ -633,6 +643,22 @@ class Parser:
         self.next()
         return StructDefinitionStatement(name, members)
 
+    def import_statement(self) -> Statement:
+        assert self.current_token.type == TokenType.KEYWORD
+        assert self.current_token.image == "import"
+        self.next()
+        assert not self.ended, "Expected identifier after `import` but found `EOF`"
+        assert self.current_token.type == TokenType.IDENTIFIER_LITERAL, f"Expected identifier after `import` but found `{self.current_token.image}`"
+        name = self.current_token.image
+        self.next()
+        while (not self.ended and self.current_token.type == TokenType.DOT):
+            self.next()
+            assert not self.ended, "Expected identifier after '.'"
+            assert self.current_token.type == TokenType.IDENTIFIER_LITERAL, "Expected identifier after '.'"
+            name += f".{self.current_token.image}"
+            self.next()
+        return ImportStatement(name)
+
     def statement(self) -> Statement:
         match(self.current_token):
             case Token(TokenType.KEYWORD, "struct"):
@@ -645,6 +671,8 @@ class Parser:
                 return self.for_statement()
             case Token(TokenType.KEYWORD, "while"):
                 return self.while_statement()
+            case Token(TokenType.KEYWORD, "import"):
+                return self.import_statement()
         return self.expression_statement()
 
     def program(self) -> Program:
@@ -653,10 +681,5 @@ class Parser:
             statements.append(self.statement())
         return Program(statements)
 
-    def _try_parse(self, rule: Callable[[], RuleReturnType]) -> RuleReturnType | None:
-        start_pos = self.current
-        try:
-            return rule()
-        except AssertionError:
-            self.current = start_pos
-            return None
+    def parse(self) -> Program:
+        return self.program()

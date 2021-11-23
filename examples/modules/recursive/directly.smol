@@ -1,0 +1,3 @@
+import directly
+
+print("foo")

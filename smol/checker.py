@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from typing import NamedTuple, Optional, Tuple
 
 from smol.parser import (AdditionExpression, ArrayExpression,
-                         AssignmentStatement, BlockExpression, BooleanExpression, PropertyAccessExpression, StructDefinitionStatement, TypeBuiltInExpression,
+                         AssignmentStatement, BlockExpression, BooleanExpression, ImportStatement, PropertyAccessExpression, StructDefinitionStatement, TypeBuiltInExpression,
                          ComparisonExpression, EqualityExpression,
                          ExponentiationExpression, Expression,
                          ExpressionStatement, ForStatement,
@@ -11,7 +11,7 @@ from smol.parser import (AdditionExpression, ArrayExpression,
                          IfExpression, IntegerExpression,
                          MultiplicationExpression, NegationExpression, Program, RangeExpression,
                          Statement, StringExpression, TypeDeduceExpression, TypeExpression, TypeIdentifierExpression, WhileStatement)
-from smol.utils import Scope
+from smol.utils import Scope, StageContext
 
 
 @dataclass(eq=True, frozen=True)
@@ -73,6 +73,12 @@ class StructType(CheckerType):
 
 
 @dataclass(eq=True, frozen=True)
+class ModuleType(CheckerType):
+    name: str
+    types: dict[str, CheckerType]
+
+
+@dataclass(eq=True, frozen=True)
 class TypedExpression:
     type: CheckerType
     value: Expression
@@ -94,15 +100,16 @@ class BuiltInType(NamedTuple):
 
 class Checker:
     program: Program
+    context: StageContext
     errors: list[str] = []
     scope: Scope = Scope.from_dict({
         "print": FunctionType("print", (FunctionArgumentType("to_print", BuiltInType.string),), BuiltInType.none),
         "str": FunctionType("str", (FunctionArgumentType("from", BuiltInType.int),), BuiltInType.string)
     })
 
-    def __init__(self, program: Program):
+    def __init__(self, program: Program, context: StageContext):
         self.program = program
-        self.errors = []
+        self.context = context
 
     def check(self):
         self.check_program(self.program)
@@ -277,25 +284,25 @@ class Checker:
                     return TypedExpression(ListType("list", element_types[0], len(element_types)), expression)
                 self.errors.append("Invalid types of array elements")
                 return TypedExpression(BuiltInType.invalid, expression)
-            case PropertyAccessExpression(expression, property):
-                typ = self.evaluate_type_expression(expression, scope)
+            case PropertyAccessExpression(obj, property):
+                typ = self.evaluate_type_expression(obj, scope)
+                if isinstance(typ.type, ModuleType):
+                    # TODO: add typecheking for module properties
+                    fn = FunctionType(property, (), BuiltInType.none)
+                    return TypedExpression(fn, expression)
                 if not isinstance(typ.type, StructType):
                     self.errors.append(
                         f"Invalid operation: {typ.type} has no property {property}")
-                    return TypedExpression(BuiltInType.invalid, expression)
+                    return TypedExpression(BuiltInType.invalid, obj)
                 member_typ = typ.type.get(property)
                 if member_typ is None:
                     self.errors.append(
                         f"Invalid operation: {typ.type} has no property {property}")
                     return TypedExpression(BuiltInType.invalid, expression)
                 return TypedExpression(member_typ.type, expression)
-            case FunctionCallExpression(name):
-                if not scope.rec_contains(name.name):
-                    self.errors.append(
-                        f"Invalid function call: {name} is not a valid function")
-                    return TypedExpression(BuiltInType.invalid, expression)
-
-                function = scope.rec_get(name.name)
+            case FunctionCallExpression(object):
+                typ = self.evaluate_type_expression(object, scope)
+                function = typ.type
                 match function:
                     case FunctionType():
                         return self.function_call_from_function(function, expression, scope)
@@ -303,7 +310,7 @@ class Checker:
                         return self.struct_constructor_call(function, expression, scope)
                     case _:
                         self.errors.append(
-                            f"Invalid function call: {name} is not a valid function")
+                            f"Invalid function call: {function.name} is not a valid function")
                         return TypedExpression(BuiltInType.invalid, expression)
 
             case BlockExpression(statements):
@@ -541,6 +548,21 @@ class Checker:
         scope.rec_set(statement.name, typ)
         return TypedStatement(typ, statement)
 
+    def check_import_statement(self, statement: ImportStatement, scope: Scope) -> TypedStatement:
+        if scope.parent is not None:
+            self.errors.append(
+                f"Import statement is not allowed in inner scope")
+            return TypedStatement(BuiltInType.invalid, statement)
+        paths = statement.name.split(".")
+        name = paths[-1]
+        if scope.rec_contains(name):
+            self.errors.append(
+                f"Name {name} is already defined")
+            return TypedStatement(BuiltInType.invalid, statement)
+        # TODO: typecheck the module
+        scope.rec_set(name, ModuleType(name, {}))
+        return TypedStatement(BuiltInType.none, statement)
+
     def check_statement(self, statement: Statement, scope: Scope = None) -> TypedStatement:
         if scope is None:
             scope = self.scope
@@ -557,5 +579,7 @@ class Checker:
                 return self.check_function_definition_statement(statement, scope)
             case StructDefinitionStatement():
                 return self.check_struct_definition_statement(statement, scope)
+            case ImportStatement():
+                return self.check_import_statement(statement, scope)
 
         raise NotImplementedError(f"Unknown statement: {statement}")

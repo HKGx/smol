@@ -72,7 +72,7 @@ class Token:
 
 
 KEYWORDS = {"if", "else", "mut", "let", "do", "end",
-            "while", "for", "in", "break", "continue", "fn", "struct"}
+            "while", "for", "in", "break", "continue", "fn", "struct", "import"}
 
 
 class Tokenizer:
@@ -245,8 +245,7 @@ class Tokenizer:
                   or self.current_character in ("_")):  # identifier literal
                 self._tokens.append(self.identifier_literal())
             else:
-                print(f"Unknown character {self.current_character}")
-                assert False, "other tokens not yet implemented"
+                assert False, f"Unknown character {self.current_character}"
         return self._tokens
 
     @classmethod

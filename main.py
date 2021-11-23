@@ -1,50 +1,67 @@
+from dataclasses import dataclass
 from io import TextIOWrapper
+from pathlib import Path
 from pprint import pprint
 
 from smol.checker import Checker
-from smol.interpret import Interpreter
+from smol.interpret import Interpreter, InterpreterContext
 from smol.parser import Parser
 from smol.tokenizer import Tokenizer
+from smol.utils import StageContext
 
 
-def compile_file(file: TextIOWrapper, debug: bool = False):
+@dataclass(frozen=True)
+class SmolContext:
+    file: TextIOWrapper | None
+    path: Path | None
+    debug: bool = False
+    no_checker: bool = False
+
+
+def compile_file(ctx: SmolContext):
     raise NotImplementedError("Compiling files is not implemented yet")
 
 
-def check_file(file: TextIOWrapper, debug: bool = False):
-    tokens = Tokenizer(file.read()).tokenize()
-    if debug:
+def check_file(ctx: SmolContext):
+    assert ctx.file is not None, "File is not specified"
+    assert ctx.path is not None, "Path is not specified"
+    tokens = Tokenizer.from_file(ctx.file).tokenize()
+    if ctx.debug:
         pprint(tokens)
-    prog = Parser(tokens).program()
-    if debug:
+    prog = Parser(tokens).parse()
+    if ctx.debug:
         pprint(prog)
-    checker = Checker(prog)
+    context = StageContext(ctx.path.parent)
+    checker = Checker(prog, context)
     for error in checker.check():
         print(error)
     if not checker.has_errors:
         print("No errors found")
 
 
-def interpret_file(file: TextIOWrapper, debug: bool = False, no_checker: bool = False):
-    tokens = Tokenizer(file.read()).tokenize()
-    if debug:
+def interpret_file(ctx: SmolContext):
+    assert ctx.file is not None, "File is not specified"
+    assert ctx.path is not None, "Path is not specified"
+    tokens = Tokenizer.from_file(ctx.file).tokenize()
+    if ctx.debug:
         pprint(tokens)
     prog = Parser(tokens).program()
-    if debug:
+    if ctx.debug:
         pprint(prog)
-    if no_checker:
-        interpreter = Interpreter(prog)
+    context = InterpreterContext(ctx.path.parent)
+    if ctx.no_checker:
+        interpreter = Interpreter(prog, context)
         pprint(interpreter.run())
         return
-    checker = Checker(prog)
+    checker = Checker(prog, context)
     for error in checker.check():
         print(error)
     if not checker.has_errors:
-        interpreter = Interpreter(prog)
+        interpreter = Interpreter(prog, context)
         pprint(interpreter.run())
 
 
-def repl(debug: bool = False):
+def repl(ctx: SmolContext):
     content: list[str] = []
     while True:
         line = input('> ' if len(content) == 0 else '. ')
@@ -54,17 +71,18 @@ def repl(debug: bool = False):
             continue
         joined = '\n'.join(content)
         tokens = Tokenizer(joined).tokenize()
-        if debug:
+        if ctx.debug:
             pprint(tokens)
         prog = Parser(tokens).program()
-        if debug:
+        if ctx.debug:
             pprint(prog)
-        checker = Checker(prog)
+        context = InterpreterContext(current_directory=Path.cwd())
+        checker = Checker(prog, context)
         for error in checker.check():
             print(error)
         if not checker.has_errors:
             print("No errors found during typecheking")
-            interpreter = Interpreter(prog)
+            interpreter = Interpreter(prog, context)
             pprint(interpreter.run())
         content = []
 
@@ -82,17 +100,20 @@ if __name__ == "__main__":
     parser.add_argument("--debug", "-d", action="store_true")
     parser.add_argument("--no-checker", action="store_true")
     parsed_args = parser.parse_args()
+    file_path: Path | None = Path(
+        parsed_args.file.name).resolve() if parsed_args.file else None
+    smol_context = SmolContext(
+        parsed_args.file, file_path, parsed_args.debug, parsed_args.no_checker)
     match (parsed_args.file, parsed_args.run_type):
-        case (None, 'repl' | "r"):
-            repl(parsed_args.debug)
+        case (None, 'repl' | "r" | None):
+            repl(smol_context)
         case (None, _):
             print("No file specified")
         case (_, "interpret" | "i"):
-            interpret_file(parsed_args.file, parsed_args.debug,
-                           parsed_args.no_checker)
+            interpret_file(smol_context)
         case (_, "compile" | "c"):
-            compile_file(parsed_args.file, parsed_args.debug)
+            compile_file(smol_context)
         case (_, "check"):
-            check_file(parsed_args.file, parsed_args.debug)
+            check_file(smol_context)
         case (_, _):
             raise Exception("Invalid run_type")

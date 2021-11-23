@@ -1,0 +1,3 @@
+fn baz() do
+ print("baz")
+end

@@ -1,4 +1,7 @@
 from collections.abc import Iterable
+from dataclasses import dataclass
+import dataclasses
+from pathlib import Path
 from typing import Any, Callable
 
 from smol.parser import (AdditionExpression, ArrayExpression,
@@ -7,10 +10,11 @@ from smol.parser import (AdditionExpression, ArrayExpression,
                          EqualityExpression, ExponentiationExpression,
                          Expression, ExpressionStatement, ForStatement,
                          FunctionCallExpression, FunctionDefinitionStatement, IdentifierExpression,
-                         IfExpression, IntegerExpression,
-                         MultiplicationExpression, NegationExpression, Program, PropertyAccessExpression, RangeExpression,
+                         IfExpression, ImportStatement, IntegerExpression,
+                         MultiplicationExpression, NegationExpression, Parser, Program, PropertyAccessExpression, RangeExpression,
                          Statement, StringExpression, StructDefinitionStatement, StructMember, WhileStatement)
-from smol.utils import Scope
+from smol.tokenizer import Tokenizer
+from smol.utils import Scope, StageContext, resolve_module_path
 
 
 RETURN_TYPE = int | float | None | str | list["RETURN_TYPE"] | dict[str, "RETURN_TYPE"]
@@ -26,21 +30,58 @@ class ContinueException(Exception):
 # TODO: Add support for types inherited from checker
 
 
+def iprint(value: str) -> None:
+    print(value)
+
+
+def istr(value: int) -> str:
+    return str(value)
+
+
+@dataclass()
+class InterpreterContext(StageContext):
+    module_cache: dict[str, dict[str, RETURN_TYPE]
+                       ] = dataclasses.field(default_factory=dict)
+
+
 class Interpreter:
     program: Program
+    context: InterpreterContext
     scope: Scope[Any] = Scope.from_dict({
-        'print': print,
-        'str': str
+        'print': iprint,
+        'str': istr
     })
 
-    def __init__(self, program: Program):
+    def __init__(self, program: Program, context: InterpreterContext):
         self.program = program
+        self.context = context
 
-    def struct(self, fields: list[StructMember]) -> Callable[..., dict[str, "RETURN_TYPE"]]:
+    def struct(self) -> Callable[..., dict[str, "RETURN_TYPE"]]:
         def struct_fn(**kwargs):
             return kwargs
         struct_fn.__name__ = "__struct__"
         return struct_fn
+
+    def import_(self, name: str) -> dict[str, RETURN_TYPE]:
+        if name in self.context.import_stack:
+            raise ImportError(f"Recursive import: {name}")
+        if name in self.context.module_cache:
+            return self.context.module_cache[name]
+        module_path = resolve_module_path(self.context.current_directory, name)
+        # Tokenize module
+        tokens = Tokenizer.from_file(module_path)
+        # Parse module
+        module = Parser.from_tokenizer(tokens)
+        # Copy context
+        new_context = self.context.copy()
+        new_context.import_stack.append(name)
+        # Create new interpreter
+        interpreter = Interpreter(module.program(), new_context)
+        # Run module
+        interpreter.run()
+        # Return module scope
+        self.context.module_cache[name] = interpreter.scope
+        return interpreter.scope
 
     def lr_evaluate(self,
                     lhs: Expression,
@@ -109,20 +150,18 @@ class Interpreter:
                 value = self.evaluate(expression, scope)
                 assert isinstance(value, dict), f"{value} is not a struct"
                 return value[property]
-            case FunctionCallExpression(ident, args):
-                assert scope.rec_contains(
-                    ident.name), f"Function {ident.name} not found"
-                fun = scope.rec_get(ident.name)
+            case FunctionCallExpression(object, args):
+                object_val = self.evaluate(object, scope)
                 assert isinstance(
-                    fun, Callable), f"{fun} is not callable, {ident.name}"
+                    object_val, Callable), f"{object_val} is not callable"
                 pos, kwd = [], {}
                 for arg in args:
                     if arg.name is None:
-                        assert fun.__name__ != "__struct__", f"{fun} cannot be a struct"
+                        assert object_val.__name__ != "__struct__", f"{object_val} cannot be a struct"
                         pos.append(self.evaluate(arg.value, scope))
                     else:
                         kwd[arg.name] = self.evaluate(arg.value, scope)
-                return fun(*pos, **kwd)
+                return object_val(*pos, **kwd)
             case IdentifierExpression(name):
                 assert scope.rec_contains(
                     name), f"Undefined identifier: {name}"
@@ -197,15 +236,21 @@ class Interpreter:
                         inner_scope.rec_set(arg.name, val)
                     return self.evaluate(body, inner_scope)
                 scope.rec_set(name, fn)
-            case StructDefinitionStatement(name, fields):
-                scope.rec_set(name, self.struct(fields))
+            case StructDefinitionStatement(name):
+                # struct is technically typechecked in checker phase
+                scope.rec_set(name, self.struct())
+            case ImportStatement(name):
+                assert scope.parent is None, f"Cannot import in inner scope"
+                paths = name.split(".")
+                mname = paths[-1]
+                scope.rec_set(mname, self.import_(name))
             case _:
                 raise NotImplementedError(
                     f"Unsupported statement: {statement}")
 
     def run(self) -> RETURN_TYPE | None:
         # Execute all statements and return last
-        last: RETURN_TYPE | None = None
-        for statement in self.program.statements:
-            last = self.execute(statement, self.scope)
-        return last
+        for statement in self.program.statements[:-1]:
+            self.execute(statement, self.scope)
+        if self.program.statements:
+            return self.execute(self.program.statements[-1], self.scope)
