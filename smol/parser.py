@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from textwrap import dedent
 from typing import Callable, Literal, TypeVar
 
-from smol.tokenizer import Token, TokenType
+from smol.tokenizer import Token, TokenType, Tokenizer
 
 
 @dataclass
@@ -216,6 +216,21 @@ class Parser:
     tokens: list[Token]
     current: int = 0
 
+    @classmethod
+    def from_tokenizer(cls, tokenizer: Tokenizer) -> "Parser":
+        """
+        Creates a parser from a tokenizer.
+        If tokenizer has ended it'll return it's tokens.
+        If tokenizer hasn't ended it'll run .tokenize() on it.
+        """
+        if tokenizer.ended:
+            return cls(tokenizer._tokens)
+        else:
+            return cls(tokenizer.tokenize())
+
+    @classmethod
+    def from_file(cls, filename: str) -> "Parser":
+        return cls.from_tokenizer(Tokenizer.from_file(filename))
     @property
     def current_token(self) -> Token:
         return self.tokens[self.current]
