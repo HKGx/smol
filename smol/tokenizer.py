@@ -3,6 +3,7 @@ from enum import Enum, auto
 from functools import lru_cache
 from io import TextIOWrapper
 from pathlib import Path
+import string
 from typing import Union
 
 
@@ -106,6 +107,13 @@ class Tokenizer:
         self.current_source_idx += 1
         self.current_column += 1
 
+    def decrement(self):
+        """
+        Decrements current_source_idx and current_column
+        """
+        self.current_source_idx -= 1
+        self.current_column -= 1
+
     def __init__(self, source: str):
         self.source = source
 
@@ -145,6 +153,47 @@ class Tokenizer:
             column=self.current_column - len(image),
         )
 
+    def escape_sequence(self) -> str:
+        """
+        Parse escape sequence and return the character
+        """
+        curr = self.current_character
+        assert curr == "\\"
+        self.increment()
+        assert not self.ended, "Unexpected end of source"
+        curr = self.current_character  # Pyright doesn't like properties
+        match curr:
+            case "n":
+                return "\n"
+            case "t":
+                return "\t"
+            case "\\":
+                return "\\"
+            case "x":
+                self.increment()
+                start = self.current_source_idx
+                while not self.ended:
+                    if self.current_character in string.hexdigits:
+                        self.increment()
+                    else:
+                        break
+                content = self.source[start: self.current_source_idx]
+                self.decrement()
+                if len(content) == 0:
+                    return "x"
+                return chr(int(content, 16))
+            case "u":
+                start = self.current_source_idx
+                for _ in range(4):
+                    self.increment()
+                    assert not self.ended, "Unexpected end of source"
+                    assert self.current_character in string.hexdigits, "Invalid hexadecimal digit"
+                return chr(int(self.source[start: self.current_source_idx], 16))
+            case "\"":
+                return "\""
+            case _:
+                return curr
+
     def string_literal(self) -> Token:
         """
         Parse string literal and return Token
@@ -153,29 +202,27 @@ class Tokenizer:
         assert self.current_character == '"'
         self.increment()
         start = self.current_source_idx
+        content: str = ""
         while not self.ended:
             match self.current_character:
                 case '"':
                     break
                 case "\n":
-                    self.current_line += 1
-                    self.current_column = 0
-                    self.current_source_idx += 1
-                    continue
+                    assert False, f"Newline in string literal at {self.current_line}:{self.current_column}"
+                # Handle escape sequences
                 case "\\":
-                    self.increment()
-                    self.increment()
-                    continue
+                    content += self.escape_sequence()
+                case _:
+                    content += self.current_character
             self.increment()
         assert not self.ended, "Unterminated string literal"
         assert self.current_character == '"', "Unterminated string literal"
-        image = self.source[start: self.current_source_idx]
         self.increment()
         return Token(
             type=TokenType.STRING_LITERAL,
-            image=image,
+            image=content,
             line=self.current_line,
-            column=self.current_column - len(image),
+            column=self.current_column - start,
         )
 
     def identifier_literal(self) -> Token:
