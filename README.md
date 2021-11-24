@@ -13,7 +13,7 @@ print("Hello, World!")
 for bottles in 100..1..-1 do 
     print(str(bottles) + " bottles of bear on the wall, " + str(bottles) + " bottles of beer")
     let plural := 
-        if bottles = 2:
+        if bottles == 2:
             "bottle"
         else:
             "bottles"
