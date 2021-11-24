@@ -1,6 +1,6 @@
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional, TypeVar
+from typing import Optional, Type, TypeVar
 
 
 ScopeValue = TypeVar("ScopeValue")
@@ -49,20 +49,25 @@ class Scope(dict[str, ScopeValue]):
         return Scope(parent=self)
 
 
+to = TypeVar("to")
+
+
 @dataclass()
 class StageContext:
     current_directory: Path
+    current_file: Optional[str] = None
     import_stack: list[str] = field(default_factory=list)
-
-    def copy(self):
-        return replace(self)
 
 
 def resolve_module_path(file_dir: Path, module_name: str) -> Path:
     # module path is relative to the current working directory
     # module name "foo" is resolved to "foo.smol"
     # module name "foo.bar" is resolved to "foo/bar.smol"
-
+    if module_name.startswith("std."):
+        # strip "std." prefix
+        module_name = module_name[4:]
+        std_path = Path(__file__).parent.parent / "std"
+        return Path(std_path / f"{module_name}.smol")
     submodules = module_name.split(".")
     if len(submodules) == 1:
         return file_dir / (module_name + ".smol")

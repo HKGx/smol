@@ -1,0 +1,22 @@
+# TODO: need to parse in two cycles, one for the definitions and one for the actual code
+
+struct File
+    path: string
+    fn read() string do
+        read_file()
+    end
+end 
+
+fn open_file(path: string) File do
+    File(path := path)
+end
+
+fn close_file(mut file: File) do
+end
+
+fn read_file(mut file: File) string do 
+    ""
+end
+
+fn seek_file(mut file: File, offset: int) do
+end

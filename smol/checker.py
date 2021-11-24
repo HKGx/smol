@@ -1,9 +1,10 @@
 import dataclasses
 from dataclasses import dataclass
 from typing import NamedTuple, Optional, Tuple
+from smol.tokenizer import Tokenizer
 
 from smol.parser import (AdditionExpression, ArrayExpression,
-                         AssignmentStatement, BlockExpression, BooleanExpression, ImportStatement, PropertyAccessExpression, StructDefinitionStatement, TypeBuiltInExpression,
+                         AssignmentStatement, BlockExpression, BooleanExpression, FunctionArgument, ImportStatement, Parser, PropertyAccessExpression, StructDefinitionStatement, StructField, StructMethod, TypeBuiltInExpression,
                          ComparisonExpression, EqualityExpression,
                          ExponentiationExpression, Expression,
                          ExpressionStatement, ForStatement,
@@ -11,7 +12,7 @@ from smol.parser import (AdditionExpression, ArrayExpression,
                          IfExpression, IntegerExpression,
                          MultiplicationExpression, NegationExpression, Program, RangeExpression,
                          Statement, StringExpression, TypeDeduceExpression, TypeExpression, TypeIdentifierExpression, WhileStatement)
-from smol.utils import Scope, StageContext
+from smol.utils import Scope, StageContext, resolve_module_path
 
 
 @dataclass(eq=True, frozen=True)
@@ -57,16 +58,22 @@ class FunctionType(CheckerType):
 
 
 @dataclass(eq=True, frozen=True)
-class StructMemberType(CheckerType):
+class StructFieldType(CheckerType):
     type: CheckerType
 
 
 @dataclass(eq=True, frozen=True)
-class StructType(CheckerType):
-    members: Tuple[StructMemberType, ...]
+class StructMethodType(CheckerType):
+    type: FunctionType
 
-    def get(self, name: str) -> Optional[StructMemberType]:
-        for member in self.members:
+
+@dataclass(eq=True, frozen=True)
+class StructType(CheckerType):
+    fields: Tuple[StructFieldType, ...]
+    methods: Tuple[StructMethodType, ...]
+
+    def get(self, name: str) -> Optional[StructFieldType | StructMethodType]:
+        for member in [*self.fields, *self.methods]:
             if member.name == name:
                 return member
         return None
@@ -98,20 +105,41 @@ class BuiltInType(NamedTuple):
     invalid = InvalidType("invalid")
 
 
+@dataclass
+class CheckerContext(StageContext):
+    module_cache: dict[str, ModuleType] = dataclasses.field(
+        default_factory=dict)
+
+    def copy(self):
+        return CheckerContext(
+            current_directory=self.current_directory,
+            current_file=self.current_file,
+            import_stack=self.import_stack.copy(),
+            module_cache=self.module_cache.copy()
+        )
+
+
 class Checker:
     program: Program
-    context: StageContext
+    context: CheckerContext
     errors: list[str] = []
-    scope: Scope = Scope.from_dict({
+    scope: Scope[CheckerType] = Scope.from_dict({
         "print": FunctionType("print", (FunctionArgumentType("to_print", BuiltInType.string),), BuiltInType.none),
         "str": FunctionType("str", (FunctionArgumentType("from", BuiltInType.int),), BuiltInType.string)
-    })
+    })  # type: ignore
 
-    def __init__(self, program: Program, context: StageContext):
+    def __init__(self, program: Program, context: CheckerContext):
         self.program = program
         self.context = context
 
+    def load_stdlib(self):
+        if self.context.current_file != "std.smol":
+            self.import_("std.std")
+
     def check(self):
+        # Before checking load stdlib
+        print(self.context)
+        self.load_stdlib()
         self.check_program(self.program)
         return self.errors
 
@@ -287,9 +315,12 @@ class Checker:
             case PropertyAccessExpression(obj, property):
                 typ = self.evaluate_type_expression(obj, scope)
                 if isinstance(typ.type, ModuleType):
-                    # TODO: add typecheking for module properties
-                    fn = FunctionType(property, (), BuiltInType.none)
-                    return TypedExpression(fn, expression)
+                    if property in typ.type.types:
+                        return TypedExpression(typ.type.types[property], expression)
+                    self.errors.append(
+                        f"Invalid property access: {property} is not a valid property of {typ.type.name}"
+                    )
+                    return TypedExpression(BuiltInType.invalid, expression)
                 if not isinstance(typ.type, StructType):
                     self.errors.append(
                         f"Invalid operation: {typ.type} has no property {property}")
@@ -317,6 +348,8 @@ class Checker:
                 inner_scope = scope.spawn_child()
                 for statement in statements[:-1]:
                     self.check_statement(statement, inner_scope)
+                if len(statements) == 0:
+                    return TypedExpression(BuiltInType.none, expression)
                 stat = self.check_statement(statements[-1], inner_scope)
                 stat_type = stat.type
                 if stat.type == BuiltInType.invalid:
@@ -337,7 +370,7 @@ class Checker:
         raise NotImplementedError(f"{expression}")
 
     def struct_constructor_call(self, struct: StructType, expression: FunctionCallExpression, scope: Scope[CheckerType]) -> TypedExpression:
-        if len(expression.args) != len(struct.members):
+        if len(expression.args) != len(struct.fields):
             self.errors.append(
                 f"Invalid struct constructor call: invalid count of members")
             return TypedExpression(BuiltInType.invalid, expression)
@@ -369,7 +402,7 @@ class Checker:
                 passed_arg.value, scope)
             if arg_type.type != defined_arg.type:
                 self.errors.append(
-                    f"Invalid function call: {passed_arg.name or args.index(passed_arg)}'s type: `{arg_type.type}` doesn't match {defined_arg.type} ")
+                    f"Invalid function call {function.name}: {passed_arg.name or args.index(passed_arg)}'s type: `{arg_type.type}` doesn't match {defined_arg.type} ")
                 return TypedExpression(BuiltInType.invalid, expression)
         named_offset = len(function.positional_arg_types)
         for defined_arg, passed_arg in zip(function.named_arg_types, args[named_offset:]):
@@ -407,7 +440,7 @@ class Checker:
                 statement.type, scope) or expr_type.type
             if expr_type.type != defined_type:
                 self.errors.append(
-                    f"Invalid assignment: Defined type {defined_type} is not equal to {expr_type}!")
+                    f"Invalid assignment: Defined type {defined_type} is not equal to {expr_type.type}!")
                 return TypedStatement(BuiltInType.invalid, statement)
             if statement.mutable:
                 new_typ = dataclasses.replace(expr_type.type)  # copy type
@@ -428,7 +461,7 @@ class Checker:
             statement.type, scope) or expr_type.type
         if expr_type.type != defined_type:
             self.errors.append(
-                f"Invalid assignment: Defined type {defined_type} is not equal to {expr_type}!")
+                f"Invalid assignment: Defined type {defined_type} is not equal to {expr_type.type}!")
             return TypedStatement(BuiltInType.invalid, statement)
         if ident_type == expr_type.type and ident_type.meta.get("mut"):
             scope.rec_set(ident_name, ident_type)
@@ -475,6 +508,41 @@ class Checker:
         self.evaluate_type_expression(body, inner_scope)
         return TypedStatement(BuiltInType.none, statement)
 
+    def check_function_arguments(self, args: list[FunctionArgument], scope: Scope) -> tuple[FunctionArgumentType, ...] | None:
+        defined_args: list[FunctionArgumentType] = []
+        for arg in args:
+            if any(arg.name == a.name for a in defined_args):
+                self.errors.append(
+                    f"Argument {arg.name} already defined")
+                return None
+            arg_type = self.evaluate_type(arg.type, scope)
+            is_named = False
+            if arg.default is not None:
+                is_named = True
+            if arg_type is None:
+                if arg.default is None:
+                    self.errors.append(
+                        f"Argument {arg.name} has no type and no default value")
+                    return None
+                is_named = True
+                arg_type = self.evaluate_type_expression(
+                    arg.default, scope).type
+            if len(defined_args) > 0 and defined_args[-1].named and not is_named:
+                self.errors.append(
+                    f"Argument {arg.name} is not named but previous argument is named")
+                return None
+            defined_args.append(FunctionArgumentType(
+                arg.name, arg_type, is_named))
+
+        for i, arg in enumerate(defined_args):
+            if arg.named:
+                # Check whether next argument is also named
+                if i + 1 < len(defined_args) and not defined_args[i + 1].named:
+                    self.errors.append(
+                        f"Argument {arg.name} is named but next argument is not")
+                    return None
+        return tuple(defined_args)
+
     def check_function_definition_statement(self, statement: FunctionDefinitionStatement, scope: Scope) -> TypedStatement:
         name = statement.name
         args = statement.args
@@ -486,50 +554,29 @@ class Checker:
         return_type = self.evaluate_type(statement.return_type, scope)
         if return_type is None:
             return_type = BuiltInType.none
-
-        defined_args: list[FunctionArgumentType] = []
-        for arg in args:
-            if any(arg.name == a.name for a in defined_args):
-                self.errors.append(
-                    f"Argument {arg.name} already defined")
-                return TypedStatement(BuiltInType.invalid, statement)
-            arg_type = self.evaluate_type(arg.type, scope)
-            is_named = False
-            if arg.default is not None:
-                is_named = True
-            if arg_type is None:
-                if arg.default is None:
-                    self.errors.append(
-                        f"Argument {arg.name} has no type and no default value")
-                    return TypedStatement(BuiltInType.invalid, statement)
-                is_named = True
-                arg_type = self.evaluate_type_expression(
-                    arg.default, scope).type
-            if len(defined_args) > 0 and defined_args[-1].named and not is_named:
-                self.errors.append(
-                    f"Argument {arg.name} is not named but previous argument is named")
-                return TypedStatement(BuiltInType.invalid, statement)
-            defined_args.append(FunctionArgumentType(
-                arg.name, arg_type, is_named))
+        defined_args = self.check_function_arguments(args, scope)
+        if defined_args is None:
+            return TypedStatement(BuiltInType.invalid, statement)
+        fun = FunctionType(name, defined_args, return_type)
         inner_scope = scope.spawn_child()
-        for i, arg in enumerate(defined_args):
-            if arg.named:
-                # Check whether next argument is also named
-                if i + 1 < len(defined_args) and not defined_args[i + 1].named:
-                    self.errors.append(
-                        f"Argument {arg.name} is named but next argument is not")
-                    return TypedStatement(BuiltInType.invalid, statement)
+        for arg in defined_args:
             inner_scope.rec_set(arg.name, arg.type)
-        inner_scope.rec_set(name, FunctionType(
-            name, tuple(defined_args), return_type))
+        inner_scope.rec_set(name, fun)
         body_return_type = self.evaluate_type_expression(body, inner_scope)
         if body_return_type.type != return_type:
             self.errors.append(
                 f"Invalid return type: {body_return_type} is not equal to {return_type}")
             return TypedStatement(BuiltInType.invalid, statement)
-        scope.rec_set(name, FunctionType(
-            name, tuple(defined_args), return_type))
-        return TypedStatement(return_type, statement)
+        scope.rec_set(name, fun)
+        return TypedStatement(fun, statement)
+
+    def check_struct_field(self, field: StructField, scope: Scope) -> CheckerType:
+        field_type = self.evaluate_type(field.type, scope)
+        if field_type is None:
+            self.errors.append(
+                f"Invalid field type: {field.type}")
+            return BuiltInType.invalid
+        return field_type
 
     def check_struct_definition_statement(self, statement: StructDefinitionStatement, scope: Scope) -> TypedStatement:
         if scope.rec_contains(statement.name):
@@ -537,16 +584,89 @@ class Checker:
                 f"Invalid struct definition: Name {statement.name} is already defined!"
             )
             return TypedStatement(BuiltInType.invalid, statement)
-        members = statement.body
-        defined_members: list[StructMemberType] = []
-        for member in members:
-            member_type = self.evaluate_type(member.type, scope)
-            assert member_type is not None
-            defined_members.append(
-                StructMemberType(member.name, member_type))
-        typ = StructType(statement.name, tuple(defined_members))
-        scope.rec_set(statement.name, typ)
-        return TypedStatement(typ, statement)
+        defined_names: list[str] = []
+        defined_fields: list[StructFieldType] = []
+        for field in statement.fields:
+            if field.name in defined_names:
+                self.errors.append(
+                    f"Invalid struct definition: Field {field.name} is already defined!"
+                )
+                return TypedStatement(BuiltInType.invalid, statement)
+            field_type = self.check_struct_field(field, scope)
+            if field_type == BuiltInType.invalid:
+                self.errors.append(
+                    f"Invalid struct definition: Field {field.name} has invalid type!"
+                )
+                return TypedStatement(BuiltInType.invalid, statement)
+            defined_names.append(field.name)
+            defined_fields.append(StructFieldType(field.name, field_type))
+
+        defined_methods: list[StructMethodType] = []
+        for method in statement.methods:
+            if method.name in defined_names:
+                self.errors.append(
+                    f"Invalid struct definition: Method {method.name} is already defined!"
+                )
+                return TypedStatement(BuiltInType.invalid, statement)
+            defined_names.append(method.name)
+            args = self.check_function_arguments(method.args, scope)
+            if args is None:
+                self.errors.append(
+                    f"Invalid struct definition: Method {method.name} has invalid arguments!"
+                )
+                return TypedStatement(BuiltInType.invalid, statement)
+            return_type = self.evaluate_type(method.return_type, scope)
+            if return_type is None:
+                return_type = BuiltInType.none
+            function_type = FunctionType(method.name, args, return_type)
+            defined_methods.append(
+                StructMethodType(method.name, function_type))
+        struct_type = StructType(statement.name, tuple(
+            defined_fields), tuple(defined_methods))
+
+        inner_scope = scope.spawn_child()
+        inner_scope.rec_set("self", struct_type)
+        for method in statement.methods:
+            # Check method bodies
+            typ = self.evaluate_type_expression(method.body, inner_scope)
+            return_typ = self.evaluate_type(method.return_type, scope)
+            if typ.type != return_typ:
+                self.errors.append(
+                    f"Invalid struct definition: Method {method.name} has invalid return type!"
+                )
+                return TypedStatement(BuiltInType.invalid, statement)
+
+        scope.rec_set(statement.name, struct_type)
+        return TypedStatement(struct_type, statement)
+
+    def import_(self, name: str) -> ModuleType:
+        if name in self.context.import_stack:
+            raise ImportError(f"Recursive import: {name}")
+        if name in self.context.module_cache:
+            return self.context.module_cache[name]
+        module_path = resolve_module_path(self.context.current_directory, name)
+        # Tokenize module
+        tokens = Tokenizer.from_file(module_path)
+        # Parse module
+        module = Parser.from_tokenizer(tokens)
+        # Copy context
+        new_context = self.context.copy()
+        new_context.current_file = module_path.name
+        new_context.import_stack.append(name)
+        # Create new checker
+        checker = Checker(module.program(), new_context)
+        # Run module
+        checker.check()
+        # Check for errors
+        assert len(
+            checker.errors) == 0, f"Errors in module {name}: {checker.errors}"
+        # Return module scope
+        types: dict[str, CheckerType] = {}
+        for n, typ in checker.scope.items():
+            types[n] = typ
+        module = ModuleType(name, types)
+        self.context.module_cache[name] = module
+        return module
 
     def check_import_statement(self, statement: ImportStatement, scope: Scope) -> TypedStatement:
         if scope.parent is not None:
@@ -557,11 +677,11 @@ class Checker:
         name = paths[-1]
         if scope.rec_contains(name):
             self.errors.append(
-                f"Name {name} is already defined")
+                f"Name {name} is already defined. Cannot import {statement.name}")
             return TypedStatement(BuiltInType.invalid, statement)
-        # TODO: typecheck the module
-        scope.rec_set(name, ModuleType(name, {}))
-        return TypedStatement(BuiltInType.none, statement)
+        module = self.import_(statement.name)
+        scope.rec_set(name, module)
+        return TypedStatement(module, statement)
 
     def check_statement(self, statement: Statement, scope: Scope = None) -> TypedStatement:
         if scope is None:

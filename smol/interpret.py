@@ -1,7 +1,6 @@
 from collections.abc import Iterable
 from dataclasses import dataclass
 import dataclasses
-from pathlib import Path
 from typing import Any, Callable
 
 from smol.parser import (AdditionExpression, ArrayExpression,
@@ -12,7 +11,7 @@ from smol.parser import (AdditionExpression, ArrayExpression,
                          FunctionCallExpression, FunctionDefinitionStatement, IdentifierExpression,
                          IfExpression, ImportStatement, IntegerExpression,
                          MultiplicationExpression, NegationExpression, Parser, Program, PropertyAccessExpression, RangeExpression,
-                         Statement, StringExpression, StructDefinitionStatement, StructMember, WhileStatement)
+                         Statement, StringExpression, StructDefinitionStatement, WhileStatement)
 from smol.tokenizer import Tokenizer
 from smol.utils import Scope, StageContext, resolve_module_path
 
@@ -43,6 +42,14 @@ class InterpreterContext(StageContext):
     module_cache: dict[str, dict[str, RETURN_TYPE]
                        ] = dataclasses.field(default_factory=dict)
 
+    def copy(self):
+        return InterpreterContext(
+            current_directory=self.current_directory,
+            current_file=self.current_file,
+            import_stack=self.import_stack.copy(),
+            module_cache=self.module_cache.copy()
+        )
+
 
 class Interpreter:
     program: Program
@@ -63,6 +70,14 @@ class Interpreter:
         return struct_fn
 
     def import_(self, name: str) -> dict[str, RETURN_TYPE]:
+        if name in ("std.file"):
+            return {
+                "File": self.struct(),
+                "close_file": lambda file: file.close(),
+                "open_file": lambda path: open(path, "r"),
+                "read_file": lambda file: file.read(),
+                "seek_file": lambda file, offset: file.seek(offset),
+            }  # type: ignore
         if name in self.context.import_stack:
             raise ImportError(f"Recursive import: {name}")
         if name in self.context.module_cache:

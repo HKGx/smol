@@ -175,18 +175,6 @@ class ForStatement(Statement):
 
 
 @dataclass
-class StructMember(IdentifierExpression):
-    type: TypeExpression
-    mutable: bool
-
-
-@dataclass
-class StructDefinitionStatement(Statement):
-    name: str
-    body: list[StructMember]
-
-
-@dataclass
 class FunctionArgument(IdentifierExpression):
     type: TypeExpression
     mutable: bool
@@ -199,6 +187,31 @@ class FunctionDefinitionStatement(Statement):
     args: list[FunctionArgument]
     body: Expression
     return_type: TypeExpression
+
+
+@dataclass
+class StructField(IdentifierExpression):
+    type: TypeExpression
+    mutable: bool
+
+
+@dataclass
+class StructMethod(FunctionDefinitionStatement):
+    @classmethod
+    def from_function(cls, function: FunctionDefinitionStatement):
+        return cls(
+            name=function.name,
+            args=function.args,
+            body=function.body,
+            return_type=function.return_type,
+        )
+
+
+@dataclass
+class StructDefinitionStatement(Statement):
+    name: str
+    fields: list[StructField]
+    methods: list[StructMethod]
 
 
 @dataclass
@@ -556,7 +569,7 @@ class Parser:
         value = self.expression()
         return AssignmentStatement(identifier, value, typ, is_mutable)
 
-    def function_definition_statement(self) -> Statement:
+    def function_definition_statement(self) -> FunctionDefinitionStatement:
         # TODO: investigate whether this can be simplified
         assert self.current_token.type == TokenType.KEYWORD
         assert self.current_token.image == "fn"
@@ -610,7 +623,7 @@ class Parser:
         body = self.enter_body()
         return FunctionDefinitionStatement(name, args, body, typ)
 
-    def struct_member(self) -> StructMember:
+    def struct_member(self) -> StructField:
         is_mutable = False
         if self.current_token.type == TokenType.KEYWORD and self.current_token.image == "mut":
             self.next()
@@ -624,7 +637,14 @@ class Parser:
         self.next()
         assert not self.ended, "Expected type but found `EOF`"
         typ = self.type_expression()
-        return StructMember(name, typ, is_mutable)
+        return StructField(name, typ, is_mutable)
+
+    def struct_method(self) -> StructMethod:
+        assert not self.ended, "Expected identifier but found `EOF`"
+        assert self.current_token.type == TokenType.KEYWORD, f"Expected `fn` but found `{self.current_token.image}`"
+        assert self.current_token.image == "fn", f"Expected `fn` but found `{self.current_token.image}`"
+        func_def = self.function_definition_statement()
+        return StructMethod.from_function(func_def)
 
     def struct_definition_statement(self) -> Statement:
         assert self.current_token.type == TokenType.KEYWORD
@@ -635,13 +655,21 @@ class Parser:
         name = self.current_token.image
         self.next()
         assert not self.ended, "Expected member or end of struct but found `EOF`"
-        members: list[StructMember] = []
+        fields: list[StructField] = []
+        methods: list[StructMethod] = []
         while not self.ended:
-            if self.current_token.type == TokenType.KEYWORD and self.current_token.image == "end":
-                break
-            members.append(self.struct_member())
+            match self.current_token:
+                case Token(TokenType.KEYWORD, "fn"):
+                    methods.append(self.struct_method())
+                case Token(TokenType.IDENTIFIER_LITERAL) | Token(TokenType.KEYWORD, "mut"):
+                    fields.append(self.struct_member())
+                case Token(TokenType.KEYWORD, "end"):
+                    break
+                case _:
+                    raise Exception(
+                        f"Expected member or end of struct but found `{self.current_token.image}`")
         self.next()
-        return StructDefinitionStatement(name, members)
+        return StructDefinitionStatement(name, fields, methods)
 
     def import_statement(self) -> Statement:
         assert self.current_token.type == TokenType.KEYWORD

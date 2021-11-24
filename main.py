@@ -1,9 +1,10 @@
 from dataclasses import dataclass
+from importlib.resources import path
 from io import TextIOWrapper
 from pathlib import Path
 from pprint import pprint
 
-from smol.checker import Checker
+from smol.checker import Checker, CheckerContext
 from smol.interpret import Interpreter, InterpreterContext
 from smol.parser import Parser
 from smol.tokenizer import Tokenizer
@@ -31,7 +32,11 @@ def check_file(ctx: SmolContext):
     prog = Parser(tokens).parse()
     if ctx.debug:
         pprint(prog)
-    context = StageContext(ctx.path.parent)
+    kw_context = {
+        'current_directory': ctx.path.parent,
+        'current_file': ctx.path.name,
+    }
+    context = CheckerContext(**kw_context)
     checker = Checker(prog, context)
     for error in checker.check():
         print(error)
@@ -48,16 +53,21 @@ def interpret_file(ctx: SmolContext):
     prog = Parser(tokens).program()
     if ctx.debug:
         pprint(prog)
-    context = InterpreterContext(ctx.path.parent)
+    kw_context = {
+        'current_directory': ctx.path.parent,
+        'current_file': ctx.path.name,
+    }
+    icontext = InterpreterContext(**kw_context)
+    ccontext = CheckerContext(**kw_context)
     if ctx.no_checker:
-        interpreter = Interpreter(prog, context)
+        interpreter = Interpreter(prog, icontext)
         pprint(interpreter.run())
         return
-    checker = Checker(prog, context)
+    checker = Checker(prog, ccontext)
     for error in checker.check():
         print(error)
     if not checker.has_errors:
-        interpreter = Interpreter(prog, context)
+        interpreter = Interpreter(prog, icontext)
         pprint(interpreter.run())
 
 
@@ -76,13 +86,14 @@ def repl(ctx: SmolContext):
         prog = Parser(tokens).program()
         if ctx.debug:
             pprint(prog)
-        context = InterpreterContext(current_directory=Path.cwd())
-        checker = Checker(prog, context)
+        icontext = InterpreterContext(current_directory=Path.cwd())
+        ccontext = CheckerContext(current_directory=Path.cwd())
+        checker = Checker(prog, ccontext)
         for error in checker.check():
             print(error)
         if not checker.has_errors:
             print("No errors found during typecheking")
-            interpreter = Interpreter(prog, context)
+            interpreter = Interpreter(prog, icontext)
             pprint(interpreter.run())
         content = []
 

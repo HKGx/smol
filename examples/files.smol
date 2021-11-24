@@ -1,0 +1,8 @@
+import std.file
+
+let f := file.open_file("./examples/factorial.smol")
+let f_contents := file.read_file(f)
+file.seek_file(f, 0)
+let f_contents_again := file.read_file(f)
+if f_contents != f_contents_again: print("File contents are not the same")
+else: print("File contents are the same")
