@@ -12,5 +12,7 @@ let e := "a\"123"
 let f := "a\x23" # "a#"
 # Test hex emoji escape
 let g := "a\x1F603" # "a😃"
+# Test \x escape
+let h := "a\x" # "ax"
 
-for i in [a, b, c, d, e, f, g]: print(i)
+for i in [a, b, c, d, e, f, g, h] do print("\n\n") print(i) end
