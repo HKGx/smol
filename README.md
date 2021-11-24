@@ -12,7 +12,7 @@ print("Hello, World!")
 ```fs
 for bottles in 100..1..-1 do 
     print(str(bottles) + " bottles of bear on the wall, " + str(bottles) + " bottles of beer")
-    let plural = 
+    let plural := 
         if bottles = 2:
             "bottle"
         else:
@@ -34,7 +34,5 @@ They're yet to be reached, be patient! ฅ^•ﻌ•^ฅ
   
 
 Syntax is still under heated debate, it'll take time to settle on one thing
-
-Currently, we're dynamically and strongly typed, but it shall soon change as we add compile-time (parse-time?) type-checking.
 
 
