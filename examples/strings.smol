@@ -1,0 +1,16 @@
+# Test normal strings
+let a := "a123"
+# Test newline
+let b := "a\n123" 
+# Test tab
+let c := "a\t123"
+# Test backslash
+let d := "a\\123" 
+# Test escaped "
+let e := "a\"123"
+# Test hex escape
+let f := "a\x23" # "a#"
+# Test hex emoji escape
+let g := "a\x1F603" # "a😃"
+
+for i in [a, b, c, d, e, f, g]: print(i)
