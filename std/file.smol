@@ -7,7 +7,16 @@ struct File
     fn read() string do
         read_file(self)
     end
+
+    fn seek(offset: int) do
+        seek_file(self, offset)
+    end
+
+    fn close() do
+        close_file(self)
+    end
 end 
+
 
 fn open_file(path: string) File do
     File(path := path)
