@@ -1,17 +1,23 @@
 import dataclasses
 from dataclasses import dataclass
 from typing import NamedTuple, Optional, Tuple
-from smol.tokenizer import Tokenizer
 
 from smol.parser import (AdditionExpression, ArrayExpression,
-                         AssignmentStatement, BlockExpression, BooleanExpression, FunctionArgument, ImportStatement, Parser, PropertyAccessExpression, StructDefinitionStatement, StructField, StructMethod, TypeBuiltInExpression,
-                         ComparisonExpression, EqualityExpression,
-                         ExponentiationExpression, Expression,
-                         ExpressionStatement, ForStatement,
-                         FunctionCallExpression, FunctionDefinitionStatement, IdentifierExpression,
-                         IfExpression, IntegerExpression,
-                         MultiplicationExpression, NegationExpression, Program, RangeExpression,
-                         Statement, StringExpression, TypeDeduceExpression, TypeExpression, TypeIdentifierExpression, WhileStatement)
+                         AssignmentStatement, BlockExpression,
+                         BooleanExpression, ComparisonExpression,
+                         EqualityExpression, ExponentiationExpression,
+                         Expression, ExpressionStatement, ForStatement,
+                         FunctionArgument, FunctionCallExpression,
+                         FunctionDefinitionStatement, IdentifierExpression,
+                         IfExpression, ImportStatement, IntegerExpression,
+                         MultiplicationExpression, NegationExpression, Parser,
+                         Program, PropertyAccessExpression, RangeExpression,
+                         Statement, StringExpression,
+                         StructDefinitionStatement, StructField, StructMethod,
+                         TypeBuiltInExpression, TypeDeduceExpression,
+                         TypeExpression, TypeIdentifierExpression,
+                         WhileStatement)
+from smol.tokenizer import Tokenizer
 from smol.utils import Scope, StageContext, resolve_module_path
 
 
@@ -114,7 +120,7 @@ class CheckerContext(StageContext):
         return CheckerContext(
             current_directory=self.current_directory,
             current_file=self.current_file,
-            import_stack=self.import_stack.copy(),
+            import_stack=self.import_stack[:],
             module_cache=self.module_cache.copy()
         )
 
@@ -131,15 +137,13 @@ class Checker:
     def __init__(self, program: Program, context: CheckerContext):
         self.program = program
         self.context = context
-
-    def load_stdlib(self):
-        if self.context.current_file != "std.smol":
-            self.import_("std.std")
+        self.errors = []
+        self.scope = Scope.from_dict({  # type: ignore
+            "print": FunctionType("print", (FunctionArgumentType("to_print", BuiltInType.string),), BuiltInType.none),
+            "str": FunctionType("str", (FunctionArgumentType("from", BuiltInType.int),), BuiltInType.string)
+        })
 
     def check(self):
-        # Before checking load stdlib
-        print(self.context)
-        self.load_stdlib()
         self.check_program(self.program)
         return self.errors
 
@@ -148,6 +152,24 @@ class Checker:
         return len(self.errors) > 0
 
     def check_program(self, program: Program):
+        """
+        Check a program in two cycles. First add all the types to the scope, then check the program.
+        """
+        # Check imports first and add them to the scope
+        for import_statement in program.imports:
+            self.check_import_statement(
+                import_statement, self.scope, is_def=True)
+        assert not self.has_errors, "Import errors"
+        # Add struct types to the scope
+        for struct_definition in program.structs:
+            self.check_struct_definition_statement(
+                struct_definition, self.scope, is_def=True)
+            assert not self.has_errors, "Struct errors"
+        # Add function types to the scope
+        for function_definition in program.functions:
+            self.check_function_definition_statement(
+                function_definition, self.scope, is_def=True)
+            assert not self.has_errors, "Function errors"
         for statement in program.statements:
             self.check_statement(statement)
 
@@ -543,14 +565,24 @@ class Checker:
                     return None
         return tuple(defined_args)
 
-    def check_function_definition_statement(self, statement: FunctionDefinitionStatement, scope: Scope) -> TypedStatement:
+    def check_function_definition_statement(self, statement: FunctionDefinitionStatement, scope: Scope, is_def: bool = False) -> TypedStatement:
         name = statement.name
         args = statement.args
         body = statement.body
         if scope.rec_contains(name):
-            self.errors.append(
-                f"Function {name} already defined")
-            return TypedStatement(BuiltInType.invalid, statement)
+            fun = scope.rec_get(name)
+            if not isinstance(fun, FunctionType):
+                self.errors.append(
+                    f"Function {name} already defined")
+                return TypedStatement(BuiltInType.invalid, statement)
+            if fun.meta["is_def"] and is_def:
+                self.errors.append(
+                    f"Function {name} already defined")
+                return TypedStatement(BuiltInType.invalid, statement)
+            if not fun.meta["is_def"] and not is_def:
+                self.errors.append(
+                    f"Function {name} already defined")
+                return TypedStatement(BuiltInType.invalid, statement)
         return_type = self.evaluate_type(statement.return_type, scope)
         if return_type is None:
             return_type = BuiltInType.none
@@ -558,6 +590,10 @@ class Checker:
         if defined_args is None:
             return TypedStatement(BuiltInType.invalid, statement)
         fun = FunctionType(name, defined_args, return_type)
+        fun.meta["is_def"] = is_def
+        if is_def:
+            scope.rec_set(name, fun)
+            return TypedStatement(fun, statement)
         inner_scope = scope.spawn_child()
         for arg in defined_args:
             inner_scope.rec_set(arg.name, arg.type)
@@ -578,12 +614,24 @@ class Checker:
             return BuiltInType.invalid
         return field_type
 
-    def check_struct_definition_statement(self, statement: StructDefinitionStatement, scope: Scope) -> TypedStatement:
+    def check_struct_definition_statement(self, statement: StructDefinitionStatement, scope: Scope, is_def: bool = False) -> TypedStatement:
         if scope.rec_contains(statement.name):
-            self.errors.append(
-                f"Invalid struct definition: Name {statement.name} is already defined!"
-            )
-            return TypedStatement(BuiltInType.invalid, statement)
+            fun = scope.rec_get(statement.name)
+            if not isinstance(fun, StructType):
+                self.errors.append(
+                    f"Invalid struct definition: Name {statement.name} is already defined!"
+                )
+                return TypedStatement(BuiltInType.invalid, statement)
+            if fun.meta["is_def"] and is_def:
+                self.errors.append(
+                    f"Invalid struct definition: Name {statement.name} is already defined!"
+                )
+                return TypedStatement(BuiltInType.invalid, statement)
+            if not fun.meta["is_def"] and not is_def:
+                self.errors.append(
+                    f"Invalid struct definition: Name {statement.name} is already defined!"
+                )
+                return TypedStatement(BuiltInType.invalid, statement)
         defined_names: list[str] = []
         defined_fields: list[StructFieldType] = []
         for field in statement.fields:
@@ -623,6 +671,10 @@ class Checker:
                 StructMethodType(method.name, function_type))
         struct_type = StructType(statement.name, tuple(
             defined_fields), tuple(defined_methods))
+        struct_type.meta["is_def"] = is_def
+        if is_def:
+            scope.rec_set(statement.name, struct_type)
+            return TypedStatement(struct_type, statement)
 
         inner_scope = scope.spawn_child()
         inner_scope.rec_set("self", struct_type)
@@ -635,7 +687,6 @@ class Checker:
                     f"Invalid struct definition: Method {method.name} has invalid return type!"
                 )
                 return TypedStatement(BuiltInType.invalid, statement)
-
         scope.rec_set(statement.name, struct_type)
         return TypedStatement(struct_type, statement)
 
@@ -654,7 +705,8 @@ class Checker:
         new_context.current_file = module_path.name
         new_context.import_stack.append(name)
         # Create new checker
-        checker = Checker(module.program(), new_context)
+        program = module.program()
+        checker = Checker(program, new_context)
         # Run module
         checker.check()
         # Check for errors
@@ -668,7 +720,7 @@ class Checker:
         self.context.module_cache[name] = module
         return module
 
-    def check_import_statement(self, statement: ImportStatement, scope: Scope) -> TypedStatement:
+    def check_import_statement(self, statement: ImportStatement, scope: Scope, is_def: bool = False) -> TypedStatement:
         if scope.parent is not None:
             self.errors.append(
                 f"Import statement is not allowed in inner scope")
@@ -676,12 +728,20 @@ class Checker:
         paths = statement.name.split(".")
         name = paths[-1]
         if scope.rec_contains(name):
-            self.errors.append(
-                f"Name {name} is already defined. Cannot import {statement.name}")
-            return TypedStatement(BuiltInType.invalid, statement)
+            mod = scope.rec_get(name)
+            conditions = [
+                mod.meta["is_def"] and is_def,
+                not mod.meta["is_def"] and not is_def
+            ]
+            if any(conditions):
+                self.errors.append(
+                    f"Name {name} is already defined. Cannot import {statement.name}")
+                return TypedStatement(BuiltInType.invalid, statement)
         module = self.import_(statement.name)
+        module.meta["is_def"] = is_def
         scope.rec_set(name, module)
-        return TypedStatement(module, statement)
+        stat = TypedStatement(module, statement)
+        return stat
 
     def check_statement(self, statement: Statement, scope: Scope = None) -> TypedStatement:
         if scope is None:
