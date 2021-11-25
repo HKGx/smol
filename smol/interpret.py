@@ -1,20 +1,23 @@
+import dataclasses
 from collections.abc import Iterable
 from dataclasses import dataclass
-import dataclasses
 from typing import Any, Callable
 
 from smol.parser import (AdditionExpression, ArrayExpression,
-                         AssignmentStatement, BlockExpression, BooleanExpression, BreakExpression,
+                         AssignmentStatement, BlockExpression,
+                         BooleanExpression, BreakExpression,
                          ComparisonExpression, ContinueExpression,
                          EqualityExpression, ExponentiationExpression,
                          Expression, ExpressionStatement, ForStatement,
-                         FunctionCallExpression, FunctionDefinitionStatement, IdentifierExpression,
-                         IfExpression, ImportStatement, IntegerExpression,
-                         MultiplicationExpression, NegationExpression, Parser, Program, PropertyAccessExpression, RangeExpression,
-                         Statement, StringExpression, StructDefinitionStatement, WhileStatement)
+                         FunctionCallExpression, FunctionDefinitionStatement,
+                         IdentifierExpression, IfExpression, ImportStatement,
+                         IntegerExpression, MultiplicationExpression,
+                         NegationExpression, Parser, Program,
+                         PropertyAccessExpression, RangeExpression, Statement,
+                         StringExpression, StructDefinitionStatement,
+                         WhileStatement)
 from smol.tokenizer import Tokenizer
 from smol.utils import Scope, StageContext, resolve_module_path
-
 
 RETURN_TYPE = int | float | None | str | list["RETURN_TYPE"] | dict[str, "RETURN_TYPE"]
 
@@ -51,6 +54,16 @@ class InterpreterContext(StageContext):
         )
 
 
+def iopen_file(path: str) -> dict[str, Any]:
+    f = open(path, "r")
+    return {
+        "path": path,
+        "read": f.read,
+        "close": f.close,
+        "seek": f.seek,
+    }
+
+
 class Interpreter:
     program: Program
     context: InterpreterContext
@@ -62,6 +75,10 @@ class Interpreter:
     def __init__(self, program: Program, context: InterpreterContext):
         self.program = program
         self.context = context
+        self.scope = Scope.from_dict({
+            'print': iprint,
+            'str': istr
+        })
 
     def struct(self) -> Callable[..., dict[str, "RETURN_TYPE"]]:
         def struct_fn(**kwargs):
@@ -70,13 +87,14 @@ class Interpreter:
         return struct_fn
 
     def import_(self, name: str) -> dict[str, RETURN_TYPE]:
+        # TODOOOOO: Get rid of this hack
         if name in ("std.file"):
             return {
                 "File": self.struct(),
-                "close_file": lambda file: file.close(),
-                "open_file": lambda path: open(path, "r"),
-                "read_file": lambda file: file.read(),
-                "seek_file": lambda file, offset: file.seek(offset),
+                "close_file": lambda file: file["close"](),
+                "open_file": iopen_file,
+                "read_file": lambda file: file["read"](),
+                "seek_file": lambda file, offset: file["seek"](offset),
             }  # type: ignore
         if name in self.context.import_stack:
             raise ImportError(f"Recursive import: {name}")
