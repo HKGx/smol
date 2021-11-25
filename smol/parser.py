@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from textwrap import dedent
 from typing import Literal, TypeVar
 
@@ -7,7 +7,13 @@ from smol.tokenizer import Token, Tokenizer, TokenType
 
 @dataclass
 class Expression:
-    pass
+    edges: tuple[Token, Token] | None = field(
+        default=None, kw_only=True)
+
+    def source_position(self) -> str:
+        if self.edges is None:
+            return "?"
+        return f"{self.edges[0].line}:{self.edges[0].column}-{self.edges[1].line}:{self.edges[1].column}"
 
 
 @dataclass
@@ -282,13 +288,17 @@ class Parser:
     def type_expression(self) -> TypeExpression:
         return self.type_atomic()
 
+    def edges(self, start: Token) -> tuple[Token, Token]:
+        return start, self.current_token
+
     def type_atomic(self) -> TypeExpression:
         expr: TypeExpression
+        edges = self.edges(self.current_token)
         match self.current_token:
             case Token(TokenType.IDENTIFIER_LITERAL, "int" | "string" | "bool" | "none" as name):
-                expr = TypeBuiltInExpression(name)
+                expr = TypeBuiltInExpression(name, edges=edges)
             case Token(TokenType.IDENTIFIER_LITERAL, name):
-                expr = TypeIdentifierExpression(name)
+                expr = TypeIdentifierExpression(name, edges=edges)
             case _:
                 assert False, "Unexpected token"
         self.next()
@@ -298,15 +308,18 @@ class Parser:
         return self.equality()
 
     def equality(self) -> Expression:
+        start = self.current_token
         lhs = self.comparison()
         while (not self.ended and self.current_token.match(TokenType.EQUALS, TokenType.NOT_EQUALS)):
             assert self.current_token.image == "==" or self.current_token.image == "!="
             sign: Literal["==", "!="] = self.current_token.image
             self.next()
-            lhs = EqualityExpression(lhs, sign, self.comparison())
+            edges = self.edges(start)
+            lhs = EqualityExpression(lhs, sign, self.comparison(), edges=edges)
         return lhs
 
     def comparison(self) -> Expression:
+        start = self.current_token
         lhs = self.range_expression()
         while (not self.ended and self.current_token.match(
             TokenType.SMALLER_THAN,
@@ -320,22 +333,28 @@ class Parser:
                     or self.current_token.image == ">=")
             sign: Literal["<", ">", "<=", ">="] = self.current_token.image
             self.next()
-            lhs = ComparisonExpression(lhs, sign, self.range_expression())
+            edges = self.edges(start)
+            lhs = ComparisonExpression(
+                lhs, sign, self.range_expression(), edges=edges)
         return lhs
 
     def range_expression(self) -> Expression:
+        start = self.current_token
         lhs = self.addition()
         if (not self.ended and self.current_token.match(TokenType.RANGE)):
             assert self.current_token.image == ".."
             self.next()
             assert not self.ended, "Expected expression after '..'"
             rhs = self.addition()
+            edges = self.edges(start)
+            step = IntegerExpression(1)
             if (not self.ended and self.current_token.match(TokenType.RANGE)):
                 assert self.current_token.image == ".."
                 self.next()
                 assert not self.ended, "Expected expression after '..'"
-                return RangeExpression(lhs, rhs, self.addition())
-            return RangeExpression(lhs, rhs, IntegerExpression(1))
+                step = self.addition()
+                edges = self.edges(start)
+            return RangeExpression(lhs, rhs, step, edges=edges)
         return lhs
 
     def addition(self) -> Expression:
@@ -443,7 +462,8 @@ class Parser:
             case Token(TokenType.STRING_LITERAL):
                 expr = StringExpression(self.current_token.image)
             case Token(TokenType.IDENTIFIER_LITERAL):
-                expr = IdentifierExpression(self.current_token.image)
+                expr = IdentifierExpression(
+                    self.current_token.image, edges=self.edges(self.current_token))
             case _:
                 # TODO: improve error reporting
                 start = max(0, self.current - 10)
