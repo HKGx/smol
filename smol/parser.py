@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from textwrap import dedent
 from typing import Literal, TypeVar
 
-from smol.tokenizer import Token, TokenType, Tokenizer
+from smol.tokenizer import Token, Tokenizer, TokenType
 
 
 @dataclass
@@ -221,7 +221,10 @@ class ImportStatement(Statement):
 
 @dataclass
 class Program:
-    statements: list[Statement]
+    statements: tuple[Statement, ...]
+    structs: tuple[StructDefinitionStatement, ...]
+    functions: tuple[FunctionDefinitionStatement, ...]
+    imports: tuple[ImportStatement, ...]
 
 
 RuleReturnType = TypeVar("RuleReturnType", Expression, Program, Statement)
@@ -233,6 +236,9 @@ class Parser:
     This can be then fed into Checker or Interpreter.
     """
     tokens: list[Token]
+    structs: list[StructDefinitionStatement] = []
+    functions: list[FunctionDefinitionStatement] = []
+    imports: list[ImportStatement] = []
     current: int = 0
 
     @classmethod
@@ -265,6 +271,10 @@ class Parser:
 
     def __init__(self, tokens: list[Token]):
         self.tokens = tokens
+        self.structs = []
+        self.functions = []
+        self.imports = []
+        self.current = 0
 
     def next(self, increment: int = 1):
         self.current += increment
@@ -621,7 +631,9 @@ class Parser:
             typ = self.type_expression()
         assert not self.ended, "Expected `:` or `do` but found `EOF`"
         body = self.enter_body()
-        return FunctionDefinitionStatement(name, args, body, typ)
+        statement = FunctionDefinitionStatement(name, args, body, typ)
+        self.functions.append(statement)
+        return statement
 
     def struct_member(self) -> StructField:
         is_mutable = False
@@ -669,7 +681,9 @@ class Parser:
                     raise Exception(
                         f"Expected member or end of struct but found `{self.current_token.image}`")
         self.next()
-        return StructDefinitionStatement(name, fields, methods)
+        statement = StructDefinitionStatement(name, fields, methods)
+        self.structs.append(statement)
+        return statement
 
     def import_statement(self) -> Statement:
         assert self.current_token.type == TokenType.KEYWORD
@@ -685,7 +699,9 @@ class Parser:
             assert self.current_token.type == TokenType.IDENTIFIER_LITERAL, "Expected identifier after '.'"
             name += f".{self.current_token.image}"
             self.next()
-        return ImportStatement(name)
+        statement = ImportStatement(name)
+        self.imports.append(statement)
+        return statement
 
     def statement(self) -> Statement:
         match(self.current_token):
@@ -707,7 +723,7 @@ class Parser:
         statements = []
         while not self.ended:
             statements.append(self.statement())
-        return Program(statements)
+        return Program(tuple(statements), tuple(self.structs), tuple(self.functions), tuple(self.imports))
 
     def parse(self) -> Program:
         return self.program()
