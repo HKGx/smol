@@ -1,7 +1,6 @@
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional, Type, TypeVar
-
+from typing import Optional, TypeVar
 
 ScopeValue = TypeVar("ScopeValue")
 
