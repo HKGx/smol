@@ -1,9 +1,11 @@
+
+
 # TODO: need to parse in two cycles, one for the definitions and one for the actual code
 
 struct File
     path: string
     fn read() string do
-        read_file()
+        read_file(self)
     end
 end 
 
