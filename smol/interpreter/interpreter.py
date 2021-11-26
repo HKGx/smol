@@ -1,6 +1,7 @@
 import dataclasses
 from collections.abc import Iterable
 from dataclasses import dataclass
+import os
 from typing import Any, Callable
 
 from smol.parser.expressions import *
@@ -54,6 +55,10 @@ def iopen_file(path: str) -> dict[str, Any]:
     }
 
 
+def ishell(cmd: str) -> None:
+    os.system(cmd)
+
+
 class Interpreter:
     program: Program
     context: InterpreterContext
@@ -85,6 +90,10 @@ class Interpreter:
                 "open_file": iopen_file,
                 "read_file": lambda file: file["read"](),
                 "seek_file": lambda file, offset: file["seek"](offset),
+            }  # type: ignore
+        if name in ("std.os"):
+            return {
+                "shell": ishell
             }  # type: ignore
         if name in self.context.import_stack:
             raise ImportError(f"Recursive import: {name}")
