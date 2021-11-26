@@ -11,13 +11,15 @@ struct File
     fn close(): close_file(self)
 end 
 
-
 fn open_file(path: string) File: File(path := path)
 
+# This is just a stub that is resolved by the compiler
 fn close_file(mut file: File) do
 end
 
+# This is just a stub that is resolved by the compiler
 fn read_file(mut file: File) string: ""
 
+# This is just a stub that is resolved by the compiler
 fn seek_file(mut file: File, offset: int) do
 end
