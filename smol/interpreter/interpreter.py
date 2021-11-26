@@ -3,19 +3,9 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import Any, Callable
 
-from smol.parser import (AdditionExpression, ArrayExpression,
-                         AssignmentStatement, BlockExpression,
-                         BooleanExpression, BreakExpression,
-                         ComparisonExpression, ContinueExpression,
-                         EqualityExpression, ExponentiationExpression,
-                         Expression, ExpressionStatement, ForStatement,
-                         FunctionCallExpression, FunctionDefinitionStatement,
-                         IdentifierExpression, IfExpression, ImportStatement,
-                         IntegerExpression, MultiplicationExpression,
-                         NegationExpression, Parser, Program,
-                         PropertyAccessExpression, RangeExpression, Statement,
-                         StringExpression, StructDefinitionStatement,
-                         WhileStatement)
+from smol.parser.expressions import *
+from smol.parser.parser import Parser, Program
+from smol.parser.statements import *
 from smol.tokenizer import Tokenizer
 from smol.utils import Scope, StageContext, resolve_module_path
 
