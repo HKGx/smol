@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 
-from smol.tokenizer import Token
+from smol.lexer import Token
 
 
 @dataclass

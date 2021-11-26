@@ -6,7 +6,7 @@ from typing import Any, Callable
 from smol.parser.expressions import *
 from smol.parser.parser import Parser, Program
 from smol.parser.statements import *
-from smol.tokenizer import Tokenizer
+from smol.lexer import Lexer
 from smol.utils import Scope, StageContext, resolve_module_path
 
 RETURN_TYPE = int | float | None | str | list["RETURN_TYPE"] | dict[str, "RETURN_TYPE"]
@@ -91,10 +91,10 @@ class Interpreter:
         if name in self.context.module_cache:
             return self.context.module_cache[name]
         module_path = resolve_module_path(self.context.current_directory, name)
-        # Tokenize module
-        tokens = Tokenizer.from_file(module_path)
+        # Lex module
+        tokens = Lexer.from_file(module_path)
         # Parse module
-        module = Parser.from_tokenizer(tokens)
+        module = Parser.from_lexer(tokens)
         # Copy context
         new_context = self.context.copy()
         new_context.import_stack.append(name)
