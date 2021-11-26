@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional, TypeVar
+from typing import Optional, Protocol, TypeVar
 
 ScopeValue = TypeVar("ScopeValue")
 
@@ -75,3 +75,8 @@ def resolve_module_path(file_dir: Path, module_name: str) -> Path:
         for submodule in submodules[:-1]:
             dir = dir / submodule
         return dir / (submodules[-1] + ".smol")
+
+
+class SourcePositionable(Protocol):
+    def source_position(self) -> str:
+        ...
