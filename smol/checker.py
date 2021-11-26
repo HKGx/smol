@@ -18,7 +18,7 @@ from smol.parser import (AdditionExpression, ArrayExpression,
                          TypeExpression, TypeIdentifierExpression,
                          WhileStatement)
 from smol.tokenizer import Tokenizer
-from smol.utils import Scope, StageContext, resolve_module_path
+from smol.utils import Scope, SourcePositionable, StageContext, resolve_module_path
 
 
 @dataclass(eq=True, frozen=True)
@@ -143,7 +143,7 @@ class Checker:
             "str": FunctionType("str", (FunctionArgumentType("from", BuiltInType.int),), BuiltInType.string)
         })
 
-    def error(self, message: str, expr: Expression = None) -> None:
+    def error(self, message: str, expr: SourcePositionable = None) -> None:
         if expr is not None:
             message += f" at {expr.source_position()}"
         self._errors.append(message)
@@ -316,7 +316,7 @@ class Checker:
                         else_body, scope.spawn_child())
                     if else_body_type.type == BuiltInType.invalid:
                         self.error(
-                            f"Invalid else statement: {else_body} is not a valid expression"
+                            f"Invalid else statement: {else_body} is not a valid expression", else_body
                         )
                         return TypedExpression(BuiltInType.invalid, expression)
                     body_types.append(else_body_type.type)
@@ -324,7 +324,8 @@ class Checker:
                 # TODO: Need to discuss whether we allow multiple types in an if statement to be returned
 
                 if body_types.count(body_types[0]) != len(body_types):
-                    self.error("Invalid types of if bodies")
+                    self.error(
+                        "Invalid types of if bodies in if statement", expression)
                     return TypedExpression(BuiltInType.invalid, expression)
 
                 return TypedExpression(body_types[0], expression)
@@ -336,7 +337,7 @@ class Checker:
                     return TypedExpression(ListType("list", BuiltInType.none, 0), expression)
                 if element_types.count(element_types[0]) == len(element_types):
                     return TypedExpression(ListType("list", element_types[0], len(element_types)), expression)
-                self.error("Invalid types of array elements")
+                self.error("Invalid types of array elements", expression)
                 return TypedExpression(BuiltInType.invalid, expression)
             case PropertyAccessExpression(obj, property):
                 typ = self.evaluate_type_expression(obj, scope)
@@ -344,17 +345,17 @@ class Checker:
                     if property in typ.type.types:
                         return TypedExpression(typ.type.types[property], expression)
                     self.error(
-                        f"Invalid property access: {property} is not a valid property of {typ.type.name}"
+                        f"Invalid property access: {property} is not a valid property of {typ.type.name}", expression
                     )
                     return TypedExpression(BuiltInType.invalid, expression)
                 if not isinstance(typ.type, StructType):
                     self.error(
-                        f"Invalid operation: {typ.type} has no property {property}")
+                        f"Invalid operation: {typ.type} has no property {property}", expression)
                     return TypedExpression(BuiltInType.invalid, obj)
                 member_typ = typ.type.get(property)
                 if member_typ is None:
                     self.error(
-                        f"Invalid operation: {typ.type} has no property {property}")
+                        f"Invalid operation: {typ.type} has no property {property}", expression)
                     return TypedExpression(BuiltInType.invalid, expression)
                 return TypedExpression(member_typ.type, expression)
             case FunctionCallExpression(object):
@@ -367,7 +368,7 @@ class Checker:
                         return self.struct_constructor_call(function, expression, scope)
                     case _:
                         self.error(
-                            f"Invalid function call: {function.name} is not a valid function")
+                            f"Invalid function call: {function.name} is not a valid function", expression)
                         return TypedExpression(BuiltInType.invalid, expression)
 
             case BlockExpression(statements):
@@ -389,7 +390,7 @@ class Checker:
                 step_type = self.evaluate_type_expression(step, scope)
                 if start_type.type != BuiltInType.int or end_type.type != BuiltInType.int or step_type.type != BuiltInType.int:
                     self.error(
-                        f"Invalid range: {start_type.type} to {end_type.type} by {step_type.type}")
+                        f"Invalid range: {start_type.type} to {end_type.type} by {step_type.type}", expression)
                     return TypedExpression(BuiltInType.invalid, expression)
                 return TypedExpression(ListType("list", BuiltInType.int, None), expression)
 
@@ -398,22 +399,22 @@ class Checker:
     def struct_constructor_call(self, struct: StructType, expression: FunctionCallExpression, scope: Scope[CheckerType]) -> TypedExpression:
         if len(expression.args) != len(struct.fields):
             self.error(
-                f"Invalid struct constructor call: invalid count of members")
+                f"Invalid struct constructor call: invalid count of members", expression)
             return TypedExpression(BuiltInType.invalid, expression)
         for arg in expression.args:
             if arg.name is None:
                 self.error(
-                    f"Invalid struct constructor call: invalid member name")
+                    f"Invalid struct constructor call: invalid member name", expression)
                 return TypedExpression(BuiltInType.invalid, expression)
             defined_arg = struct.get(arg.name)
             if defined_arg is None:
                 self.error(
-                    f"Invalid struct constructor call: struct doesn't have member named {arg.name}")
+                    f"Invalid struct constructor call: struct doesn't have member named {arg.name}", expression)
                 return TypedExpression(BuiltInType.invalid, expression)
             arg_type = self.evaluate_type_expression(arg.value, scope)
             if arg_type.type != defined_arg.type:
                 self.error(
-                    f"Invalid struct constructor call: invalid type of member {arg.name}")
+                    f"Invalid struct constructor call: invalid type of member {arg.name}", expression)
                 return TypedExpression(BuiltInType.invalid, expression)
         return TypedExpression(struct, expression)
 
@@ -691,8 +692,7 @@ class Checker:
                 return_typ = BuiltInType.none
             if typ.type != return_typ:
                 self.error(
-                    f"Invalid struct definition: Method {method.name} has invalid return type!"
-                )
+                    f"Invalid struct definition: Method {method.name} has invalid return type!")
                 return TypedStatement(BuiltInType.invalid, statement)
         scope.rec_set(statement.name, struct_type)
         return TypedStatement(struct_type, statement)
