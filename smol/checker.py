@@ -2,23 +2,12 @@ import dataclasses
 from dataclasses import dataclass
 from typing import NamedTuple, Optional, Tuple
 
-from smol.parser import (AdditionExpression, ArrayExpression,
-                         AssignmentStatement, BlockExpression,
-                         BooleanExpression, ComparisonExpression,
-                         EqualityExpression, ExponentiationExpression,
-                         Expression, ExpressionStatement, ForStatement,
-                         FunctionArgument, FunctionCallExpression,
-                         FunctionDefinitionStatement, IdentifierExpression,
-                         IfExpression, ImportStatement, IntegerExpression,
-                         MultiplicationExpression, NegationExpression, Parser,
-                         Program, PropertyAccessExpression, RangeExpression,
-                         Statement, StringExpression,
-                         StructDefinitionStatement, StructField, StructMethod,
-                         TypeBuiltInExpression, TypeDeduceExpression,
-                         TypeExpression, TypeIdentifierExpression,
-                         WhileStatement)
+from smol.parser import Parser, Program
+from smol.parser.expressions import *
+from smol.parser.statements import *
 from smol.tokenizer import Tokenizer
-from smol.utils import Scope, SourcePositionable, StageContext, resolve_module_path
+from smol.utils import (Scope, SourcePositionable, StageContext,
+                        resolve_module_path)
 
 
 @dataclass(eq=True, frozen=True)
