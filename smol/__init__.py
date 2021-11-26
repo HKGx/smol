@@ -1,2 +1,1 @@
-from smol import tokenizer
-from smol import parser
+from smol import parser, tokenizer
