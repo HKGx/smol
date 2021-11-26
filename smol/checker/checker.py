@@ -33,11 +33,8 @@ class CheckerContext(StageContext):
 class Checker:
     program: Program
     context: CheckerContext
-    _errors: list[str] = []
-    scope: Scope[CheckerType] = Scope.from_dict({
-        "print": FunctionType("print", (FunctionArgumentType("to_print", BuiltInType.string),), BuiltInType.none),
-        "str": FunctionType("str", (FunctionArgumentType("from", BuiltInType.int),), BuiltInType.string)
-    })  # type: ignore
+    _errors: list[str]
+    scope: Scope[CheckerType]
 
     def __init__(self, program: Program, context: CheckerContext):
         self.program = program
