@@ -2,7 +2,14 @@ import std.file
 
 let f := file.open_file("./examples/factorial.smol")
 let f_contents := f.read()
-file.seek_file(f, 0)
+f.seek(0)
 let f_contents_again := f.read()
 if f_contents != f_contents_again: print("File contents are not the same")
+else: print("File contents are the same")
+
+
+let f2 := file.open_file("./examples/array.smol")
+let f2_contents := f2.read()
+
+if f2_contents != f_contents: print("File contents are not the same")
 else: print("File contents are the same")
