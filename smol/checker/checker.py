@@ -1,95 +1,12 @@
-import dataclasses
-from dataclasses import dataclass
-from typing import NamedTuple, Optional, Tuple
-
-from smol.parser import Parser, Program
+from dataclasses import dataclass, field, replace as dataclass_replace
+from typing import NamedTuple
+from smol.checker.checker_type import *
 from smol.parser.expressions import *
 from smol.parser.statements import *
+from smol.parser.parser import Parser, Program
 from smol.tokenizer import Tokenizer
-from smol.utils import (Scope, SourcePositionable, StageContext,
-                        resolve_module_path)
 
-
-@dataclass(eq=True, frozen=True)
-class CheckerType:
-    name: str
-    meta: dict[str, bool] = dataclasses.field(
-        init=False, default_factory=dict, compare=False)
-
-
-@dataclass(eq=True, frozen=True)
-class InvalidType(CheckerType):
-    name = "invalid"
-
-
-@dataclass(eq=True, frozen=True)
-class ListType(CheckerType):
-    type: CheckerType
-    known_length: Optional[int]
-
-
-@dataclass(eq=True, frozen=True)
-class FunctionArgumentType(CheckerType):
-    name: str
-    type: CheckerType
-    named: bool = False
-
-
-@dataclass(eq=True, frozen=True)
-class FunctionType(CheckerType):
-    arg_types: Tuple[FunctionArgumentType, ...]
-    to_type: CheckerType
-
-    @property
-    def named_arg_types(self) -> Tuple[FunctionArgumentType, ...]:
-        return tuple(arg_type for arg_type in self.arg_types if arg_type.named)
-
-    @property
-    def positional_arg_types(self) -> Tuple[FunctionArgumentType, ...]:
-        return tuple(arg_type for arg_type in self.arg_types if not arg_type.named)
-
-    def is_named(self, name: str) -> bool:
-        return any(arg_type.name == name for arg_type in self.named_arg_types)
-
-
-@dataclass(eq=True, frozen=True)
-class StructFieldType(CheckerType):
-    type: CheckerType
-
-
-@dataclass(eq=True, frozen=True)
-class StructMethodType(CheckerType):
-    type: FunctionType
-
-
-@dataclass(eq=True, frozen=True)
-class StructType(CheckerType):
-    fields: Tuple[StructFieldType, ...]
-    methods: Tuple[StructMethodType, ...]
-
-    def get(self, name: str) -> Optional[StructFieldType | StructMethodType]:
-        for member in [*self.fields, *self.methods]:
-            if member.name == name:
-                return member
-        return None
-
-
-@dataclass(eq=True, frozen=True)
-class ModuleType(CheckerType):
-    name: str
-    types: dict[str, CheckerType]
-
-
-@dataclass(eq=True, frozen=True)
-class TypedExpression:
-    type: CheckerType
-    value: Expression
-
-
-@dataclass
-class TypedStatement:
-    type: CheckerType
-    value: Statement
+from smol.utils import Scope, SourcePositionable, StageContext, resolve_module_path
 
 
 class BuiltInType(NamedTuple):
@@ -102,8 +19,7 @@ class BuiltInType(NamedTuple):
 
 @dataclass
 class CheckerContext(StageContext):
-    module_cache: dict[str, ModuleType] = dataclasses.field(
-        default_factory=dict)
+    module_cache: dict[str, ModuleType] = field(default_factory=dict)
 
     def copy(self):
         return CheckerContext(
@@ -167,7 +83,7 @@ class Checker:
         for statement in program.statements:
             self.check_statement(statement)
 
-    def lr_evaluate(self, lhs: Expression, rhs: Expression, scope: Scope = None) -> Tuple[TypedExpression, TypedExpression]:
+    def lr_evaluate(self, lhs: Expression, rhs: Expression, scope: Scope = None) -> tuple[TypedExpression, TypedExpression]:
         if scope is None:
             scope = self.scope
         lhs_type = self.evaluate_type_expression(lhs, scope)
@@ -459,7 +375,7 @@ class Checker:
                     f"Invalid assignment: Defined type {defined_type} is not equal to {expr_type.type}!")
                 return TypedStatement(BuiltInType.invalid, statement)
             if statement.mutable:
-                new_typ = dataclasses.replace(expr_type.type)  # copy type
+                new_typ = dataclass_replace(expr_type.type)  # copy type
                 new_typ.meta["mut"] = True
                 scope.rec_set(ident_name, new_typ)
             else:
