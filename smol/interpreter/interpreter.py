@@ -160,7 +160,7 @@ class Interpreter:
             case EqualityExpression(left, sign, right):
                 lhs, rhs = self.lr_evaluate(left, right, scope)
 
-                if sign == "=":
+                if sign == "==":
                     return lhs == rhs
                 return lhs != rhs
 
