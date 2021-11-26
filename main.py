@@ -5,10 +5,9 @@ from pathlib import Path
 from pprint import pprint
 
 from smol.checker import Checker, CheckerContext
-from smol.interpret import Interpreter, InterpreterContext
+from smol.interpreter import Interpreter, InterpreterContext
 from smol.parser import Parser
-from smol.tokenizer import Tokenizer
-from smol.utils import StageContext
+from smol.lexer import Lexer
 
 
 @dataclass(frozen=True)
@@ -26,7 +25,7 @@ def compile_file(ctx: SmolContext):
 def check_file(ctx: SmolContext):
     assert ctx.file is not None, "File is not specified"
     assert ctx.path is not None, "Path is not specified"
-    tokens = Tokenizer.from_file(ctx.file).tokenize()
+    tokens = Lexer.from_file(ctx.file).lex()
     if ctx.debug:
         pprint(tokens)
     prog = Parser(tokens).parse()
@@ -47,7 +46,7 @@ def check_file(ctx: SmolContext):
 def interpret_file(ctx: SmolContext):
     assert ctx.file is not None, "File is not specified"
     assert ctx.path is not None, "Path is not specified"
-    tokens = Tokenizer.from_file(ctx.file).tokenize()
+    tokens = Lexer.from_file(ctx.file).lex()
     if ctx.debug:
         pprint(tokens)
     prog = Parser(tokens).program()
@@ -80,7 +79,7 @@ def repl(ctx: SmolContext):
             content.append(line)
             continue
         joined = '\n'.join(content)
-        tokens = Tokenizer(joined).tokenize()
+        tokens = Lexer(joined).lex()
         if ctx.debug:
             pprint(tokens)
         prog = Parser(tokens).program()

@@ -4,7 +4,7 @@ from typing import Literal
 from smol.parser.expressions import *
 from smol.parser.statements import *
 
-from smol.tokenizer import Token, Tokenizer, TokenType
+from smol.lexer import Token, Lexer, TokenType
 
 
 @dataclass
@@ -27,20 +27,20 @@ class Parser:
     current: int = 0
 
     @classmethod
-    def from_tokenizer(cls, tokenizer: Tokenizer) -> "Parser":
+    def from_lexer(cls, lexer: Lexer) -> "Parser":
         """
-        Creates a parser from a tokenizer.
-        If tokenizer has ended it'll return it's tokens.
-        If tokenizer hasn't ended it'll run .tokenize() on it.
+        Creates a parser from lexer.
+        If lexer has ended it'll return it's tokens.
+        If lexer hasn't ended it'll run .tokenize() on it.
         """
-        if tokenizer.ended:
-            return cls(tokenizer._tokens)
+        if lexer.ended:
+            return cls(lexer._tokens)
         else:
-            return cls(tokenizer.tokenize())
+            return cls(lexer.lex())
 
     @classmethod
     def from_file(cls, filename: str) -> "Parser":
-        return cls.from_tokenizer(Tokenizer.from_file(filename))
+        return cls.from_lexer(Lexer.from_file(filename))
 
     @property
     def current_token(self) -> Token:

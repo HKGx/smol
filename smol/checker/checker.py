@@ -4,7 +4,7 @@ from smol.checker.checker_type import *
 from smol.parser.expressions import *
 from smol.parser.statements import *
 from smol.parser.parser import Parser, Program
-from smol.tokenizer import Tokenizer
+from smol.lexer import Lexer
 
 from smol.utils import Scope, SourcePositionable, StageContext, resolve_module_path
 
@@ -608,10 +608,10 @@ class Checker:
         if name in self.context.module_cache:
             return self.context.module_cache[name]
         module_path = resolve_module_path(self.context.current_directory, name)
-        # Tokenize module
-        tokens = Tokenizer.from_file(module_path)
+        # Lex module
+        tokens = Lexer.from_file(module_path)
         # Parse module
-        module = Parser.from_tokenizer(tokens)
+        module = Parser.from_lexer(tokens)
         # Copy context
         new_context = self.context.copy()
         new_context.current_file = module_path.name
