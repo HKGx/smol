@@ -71,6 +71,9 @@ class Token:
     def __repr__(self):
         return self.__str__()
 
+    def source_position(self) -> str:
+        return f"{self.line}:{self.column}"
+
 
 KEYWORDS = {"if", "else", "mut", "let", "do", "end",
             "while", "for", "in", "break", "continue", "fn", "struct", "import"}
@@ -208,7 +211,7 @@ class Tokenizer:
                 case '"':
                     break
                 case "\n":
-                    assert False, f"Newline in string literal at {self.current_line}:{self.current_column}"
+                    assert False, f"Unterminated string literal: {self.current_line}:{self.current_column}"
                 # Handle escape sequences
                 case "\\":
                     content += self.escape_sequence()
