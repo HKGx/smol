@@ -4,30 +4,20 @@
 
 struct File
     path: string
-    fn read() string do
-        read_file(self)
-    end
+    fn read() string: read_file(self)
 
-    fn seek(offset: int) do
-        seek_file(self, offset)
-    end
+    fn seek(offset: int): seek_file(self, offset)
 
-    fn close() do
-        close_file(self)
-    end
+    fn close(): close_file(self)
 end 
 
 
-fn open_file(path: string) File do
-    File(path := path)
-end
+fn open_file(path: string) File: File(path := path)
 
 fn close_file(mut file: File) do
 end
 
-fn read_file(mut file: File) string do 
-    ""
-end
+fn read_file(mut file: File) string: ""
 
 fn seek_file(mut file: File, offset: int) do
 end
