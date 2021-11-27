@@ -23,6 +23,11 @@ class ListType(CheckerType):
 
 
 @dataclass(eq=True, frozen=True)
+class UnionType(CheckerType):
+    types: tuple[CheckerType, ...]
+
+
+@dataclass(eq=True, frozen=True)
 class FunctionArgumentType(CheckerType):
     name: str
     type: CheckerType

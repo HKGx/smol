@@ -8,13 +8,17 @@ from smol.lexer import Lexer
 
 from smol.utils import Scope, SourcePositionable, StageContext, resolve_module_path
 
+"""
+TODO: Bail out of the expression, statement or module if it's not valid. Currently errors are really polluting the output.
+"""
+
 
 class BuiltInType(NamedTuple):
     int = CheckerType("int")
     string = CheckerType("string")
     bool = CheckerType("bool")
     none = CheckerType("none")
-    invalid = InvalidType("invalid")
+    invalid = InvalidType("invalid")  # Used only in checker
 
 
 @dataclass
@@ -40,9 +44,13 @@ class Checker:
         self.program = program
         self.context = context
         self._errors = []
+        to_str_arg_type = UnionType(
+            "int|string|bool", (BuiltInType.int, BuiltInType.string, BuiltInType.bool))
+        to_str_function = FunctionType(
+            "str", (FunctionArgumentType("from", to_str_arg_type),), BuiltInType.string)
         self.scope = Scope.from_dict({  # type: ignore
             "print": FunctionType("print", (FunctionArgumentType("to_print", BuiltInType.string),), BuiltInType.none),
-            "str": FunctionType("str", (FunctionArgumentType("from", BuiltInType.int),), BuiltInType.string)
+            "str": to_str_function
         })
 
     def error(self, message: str, expr: SourcePositionable = None) -> None:
@@ -102,9 +110,27 @@ class Checker:
                     self.error(f"Type {name} is not a struct", t_expression)
                     return BuiltInType.invalid
                 return typ
+            case TypeUnionExpression(union_types):
+                types: set[CheckerType] = {self.evaluate_type(
+                    t, scope) for t in union_types}  # type: ignore
+                if any(t is None for t in types):
+                    self.error(f"Invalid union type", t_expression)
+                    return BuiltInType.invalid
+                name = "|".join(t.name for t in types if t is not None)
+                return UnionType(name, tuple(types))
             case TypeDeduceExpression(): return None
         raise NotImplementedError(
             f"Unsupported type expression: {t_expression}")
+
+    def type_equal(self, typ1: CheckerType, typ2: CheckerType) -> bool:
+        if typ1 == typ2:
+            return True
+        if isinstance(typ1, UnionType) and isinstance(typ2, UnionType):
+            return all(self.type_equal(t1, t2) for t1, t2 in zip(typ1.types, typ2.types))
+
+        if isinstance(typ1, UnionType) and typ2 in typ1.types:
+            return True
+        return False
 
     def evaluate_type_expression(self, expression: Expression, scope: Scope[CheckerType] = None) -> TypedExpression:
         # TODO: Improve upon errors as they're really confusing
@@ -314,7 +340,7 @@ class Checker:
                     f"Invalid struct constructor call: struct doesn't have member named {arg.name}", expression)
                 return TypedExpression(BuiltInType.invalid, expression)
             arg_type = self.evaluate_type_expression(arg.value, scope)
-            if arg_type.type != defined_arg.type:
+            if not self.type_equal(defined_arg.type, arg_type.type):
                 self.error(
                     f"Invalid struct constructor call: invalid type of member {arg.name}", expression)
                 return TypedExpression(BuiltInType.invalid, expression)
@@ -329,7 +355,7 @@ class Checker:
                 return TypedExpression(BuiltInType.invalid, expression)
             arg_type = self.evaluate_type_expression(
                 passed_arg.value, scope)
-            if arg_type.type != defined_arg.type:
+            if not self.type_equal(defined_arg.type, arg_type.type):
                 self.error(
                     f"Invalid function call {function.name}: {passed_arg.name or args.index(passed_arg)}'s type: `{arg_type.type}` doesn't match {defined_arg.type} ")
                 return TypedExpression(BuiltInType.invalid, expression)
@@ -345,7 +371,7 @@ class Checker:
                 return TypedExpression(BuiltInType.invalid, expression)
             arg_type = self.evaluate_type_expression(
                 passed_arg.value, scope)
-            if arg_type.type != defined_arg.type:
+            if not self.type_equal(defined_arg.type, arg_type.type):
                 self.error(
                     f"Invalid function call: {function.name} is not a valid function")
                 return TypedExpression(BuiltInType.invalid, expression)
@@ -367,7 +393,7 @@ class Checker:
             expr_type = self.evaluate_type_expression(expr, scope)
             defined_type = self.evaluate_type(
                 statement.type, scope) or expr_type.type
-            if expr_type.type != defined_type:
+            if not self.type_equal(defined_type, expr_type.type):
                 self.error(
                     f"Invalid assignment: Defined type {defined_type} is not equal to {expr_type.type}!")
                 return TypedStatement(BuiltInType.invalid, statement)
@@ -388,14 +414,14 @@ class Checker:
         expr_type = self.evaluate_type_expression(expr, scope)
         defined_type = self.evaluate_type(
             statement.type, scope) or expr_type.type
-        if expr_type.type != defined_type:
+        if not self.type_equal(expr_type.type, defined_type):
             self.error(
                 f"Invalid assignment: Defined type {defined_type} is not equal to {expr_type.type}!")
             return TypedStatement(BuiltInType.invalid, statement)
-        if ident_type == expr_type.type and ident_type.meta.get("mut"):
+        if self.type_equal(ident_type, defined_type) and ident_type.meta.get("mut"):
             scope.rec_set(ident_name, ident_type)
             return TypedStatement(ident_type, statement)
-        if ident_type != expr_type.type and ident_type.meta.get("mut"):
+        if not self.type_equal(ident_type, defined_type) and ident_type.meta.get("mut"):
             self.error(
                 f"Type mismatch: Tried assigning {expr_type.type} to {ident_name} of type {ident_type}")
             return TypedStatement(BuiltInType.invalid, statement)
@@ -444,24 +470,24 @@ class Checker:
                 self.error(
                     f"Argument {arg.name} already defined")
                 return None
-            arg_type = self.evaluate_type(arg.type, scope)
+            defined_arg_type = self.evaluate_type(arg.type, scope)
             is_named = False
             if arg.default is not None:
                 is_named = True
-            if arg_type is None:
+            if defined_arg_type is None:
                 if arg.default is None:
                     self.error(
                         f"Argument {arg.name} has no type and no default value")
                     return None
                 is_named = True
-                arg_type = self.evaluate_type_expression(
+                defined_arg_type = self.evaluate_type_expression(
                     arg.default, scope).type
             if len(defined_args) > 0 and defined_args[-1].named and not is_named:
                 self.error(
                     f"Argument {arg.name} is not named but previous argument is named")
                 return None
             defined_args.append(FunctionArgumentType(
-                arg.name, arg_type, is_named))
+                arg.name, defined_arg_type, is_named))
 
         for i, arg in enumerate(defined_args):
             if arg.named:
@@ -506,7 +532,7 @@ class Checker:
             inner_scope.rec_set(arg.name, arg.type)
         inner_scope.rec_set(name, fun)
         body_return_type = self.evaluate_type_expression(body, inner_scope)
-        if body_return_type.type != return_type:
+        if not self.type_equal(body_return_type.type, return_type):
             self.error(
                 f"Invalid return type: {body_return_type} is not equal to {return_type}")
             return TypedStatement(BuiltInType.invalid, statement)
@@ -592,7 +618,7 @@ class Checker:
             return_typ = self.evaluate_type(method.return_type, scope)
             if return_typ is None:
                 return_typ = BuiltInType.none
-            if typ.type != return_typ:
+            if not self.type_equal(typ.type, return_typ):
                 self.error(
                     f"Invalid struct definition: Method {method.name} has invalid return type!")
                 return TypedStatement(BuiltInType.invalid, statement)

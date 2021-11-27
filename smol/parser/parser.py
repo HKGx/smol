@@ -64,22 +64,39 @@ class Parser:
     def next(self, increment: int = 1):
         self.current += increment
 
-    def type_expression(self) -> TypeExpression:
-        return self.type_atomic()
-
     def edges(self, start: Token) -> tuple[Token, Token]:
         return start, self.current_token
 
+    def type_expression(self) -> TypeExpression:
+        return self.type_union_expression()
+
+    def type_union_expression(self) -> TypeExpression:
+        start = self.current_token
+        expr = self.type_atomic()
+        assert not self.ended, "Expected expression after 'or'"
+        exprs: list[TypeExpression] = [expr]
+        while not self.ended:
+            match self.current_token:
+                case Token(TokenType.KEYWORD, "or"):
+                    self.next()
+                    exprs.append(self.type_atomic())
+                case _:
+                    break
+        if len(exprs) == 1:
+            return expr
+        return TypeUnionExpression(exprs, edges=self.edges(start))
+
     def type_atomic(self) -> TypeExpression:
+        assert not self.ended, "Expected type but got EOF"
         expr: TypeExpression
         edges = self.edges(self.current_token)
-        match self.current_token:
+        match (self.current_token):
             case Token(TokenType.IDENTIFIER_LITERAL, "int" | "string" | "bool" | "none" as name):
                 expr = TypeBuiltInExpression(name, edges=edges)
             case Token(TokenType.IDENTIFIER_LITERAL, name):
                 expr = TypeIdentifierExpression(name, edges=edges)
             case _:
-                assert False, "Unexpected token"
+                assert False, f"Expected type but got {self.current_token.image}"
         self.next()
         return expr
 
@@ -372,7 +389,7 @@ class Parser:
             typ = self.type_expression()
 
         assert not self.ended, "Expected `:=` but found `EOF`"
-        assert self.current_token.type == TokenType.DEFINE, "Expected `:=`"
+        assert self.current_token.type == TokenType.DEFINE, f"Expected `:=` but found {self.current_token.image}"
         self.next()
         assert not self.ended, "Expected expression after `:=` but found `EOF`"
         value = self.expression()
