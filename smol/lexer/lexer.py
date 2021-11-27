@@ -5,7 +5,7 @@ from typing import Union
 from smol.lexer.token import Token, TokenType
 
 KEYWORDS = {"if", "else", "mut", "let", "do", "end",
-            "while", "for", "in", "break", "continue", "fn", "struct", "import"}
+            "while", "for", "in", "break", "continue", "fn", "struct", "import", "or", "and", "not"}
 
 
 class Lexer:
