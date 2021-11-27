@@ -1,0 +1,5 @@
+let a: int or string := "xD"
+
+fn foo(a: int) int or string: a
+
+foo(a)
