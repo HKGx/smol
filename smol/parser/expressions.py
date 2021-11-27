@@ -134,3 +134,14 @@ class TypeBuiltInExpression(TypeExpression):
 @dataclass
 class TypeIdentifierExpression(TypeExpression):
     name: str
+
+
+@dataclass
+class TypeArrayExpression(TypeExpression):
+    # TODO: implement this
+    element: TypeExpression
+
+
+@dataclass
+class TypeUnionExpression(TypeExpression):
+    elements: list[TypeExpression]
