@@ -6,7 +6,7 @@ fn test(s: string) string : "tests/" + s + ".smol"
 fn actual_output(s: string) string : "tests/" + s + ".smol.out"
 fn desired_output(s: string) string : "tests/" + s + ".out"
 
-for t in ["equality"] do
+for t in ["equality", "stringify"] do
     let test_path := test(t)
     let actual_output_path := actual_output(t)
     let desired_output_path := desired_output(t)
