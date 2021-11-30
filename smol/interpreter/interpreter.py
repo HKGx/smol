@@ -3,32 +3,13 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 import os
 from typing import Any, Callable
+from smol.interpreter.utils import RETURN_TYPE, BreakException, ContinueException, iopen_file, iprint, ishell, istr
 
 from smol.parser.expressions import *
 from smol.parser.parser import Parser, Program
 from smol.parser.statements import *
 from smol.lexer import Lexer
 from smol.utils import Scope, StageContext, resolve_module_path
-
-RETURN_TYPE = int | float | None | str | list["RETURN_TYPE"] | dict[str, "RETURN_TYPE"]
-
-
-class BreakException(Exception):
-    pass
-
-
-class ContinueException(Exception):
-    pass
-
-# TODO: Add support for types inherited from checker
-
-
-def iprint(value: str) -> None:
-    print(value)
-
-
-def istr(value: int) -> str:
-    return str(value)
 
 
 @dataclass()
@@ -45,27 +26,10 @@ class InterpreterContext(StageContext):
         )
 
 
-def iopen_file(path: str) -> dict[str, Any]:
-    f = open(path, "r")
-    return {
-        "path": path,
-        "read": f.read,
-        "close": f.close,
-        "seek": f.seek,
-    }
-
-
-def ishell(cmd: str) -> None:
-    os.system(cmd)
-
-
 class Interpreter:
     program: Program
     context: InterpreterContext
-    scope: Scope[Any] = Scope.from_dict({
-        'print': iprint,
-        'str': istr
-    })
+    scope: Scope[Any]
 
     def __init__(self, program: Program, context: InterpreterContext):
         self.program = program
@@ -75,7 +39,7 @@ class Interpreter:
             'str': istr
         })
 
-    def struct(self) -> Callable[..., dict[str, "RETURN_TYPE"]]:
+    def struct(self) -> Callable[..., dict[str, RETURN_TYPE]]:
         def struct_fn(**kwargs):
             return kwargs
         struct_fn.__name__ = "__struct__"
