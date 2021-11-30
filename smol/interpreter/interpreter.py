@@ -130,21 +130,23 @@ class Interpreter:
         if scope is None:
             scope = self.scope
         match expression:
-            case BooleanExpression(value) | IntegerExpression(value) | StringExpression(value):
+            case (BooleanExpression(value=value)
+                  | IntegerExpression(value=value)
+                  | StringExpression(value=value)):
                 return value
-            case ExponentiationExpression(left, sign, right):
+            case ExponentiationExpression(left=left, sign=sign, right=right):
                 lhs, rhs = self.lr_evaluate(left, right, scope)
                 assert isinstance(lhs, (int, float)), f"{lhs} is not a number"
                 assert isinstance(rhs, (int, float)), f"{rhs} is not a number"
                 return lhs ** rhs
-            case MultiplicationExpression(left, sign, right):
+            case MultiplicationExpression(left=left, sign=sign, right=right):
                 lhs, rhs = self.lr_evaluate(left, right, scope)
                 assert isinstance(lhs, (int, float)), f"{lhs} is not a number"
                 assert isinstance(rhs, (int, float)), f"{rhs} is not a number"
                 if sign == '*':
                     return lhs * rhs
                 return lhs // rhs
-            case AdditionExpression(left, sign, right):
+            case AdditionExpression(left=left, sign=sign, right=right):
                 lhs, rhs = self.lr_evaluate(left, right, scope)
                 if isinstance(lhs, str) and isinstance(rhs, str):
                     return lhs + rhs
@@ -153,7 +155,7 @@ class Interpreter:
                 if sign == '+':
                     return lhs + rhs
                 return lhs - rhs
-            case ComparisonExpression(left, sign, right):
+            case ComparisonExpression(left=left, sign=sign, right=right):
                 lhs, rhs = self.lr_evaluate(left, right, scope)
                 assert isinstance(lhs, (int, float)), f"{lhs} is not a number"
                 assert isinstance(rhs, (int, float)), f"{rhs} is not a number"
@@ -166,23 +168,23 @@ class Interpreter:
                 fun = getattr(lhs, comparison_map[sign])
                 return fun(rhs)
 
-            case EqualityExpression(left, sign, right):
+            case EqualityExpression(left=left, sign=sign, right=right):
                 lhs, rhs = self.lr_evaluate(left, right, scope)
 
                 if sign == "==":
                     return lhs == rhs
                 return lhs != rhs
 
-            case NegationExpression(expression):
+            case NegationExpression(value=expression):
                 value = self.evaluate(expression, scope)
                 assert isinstance(value, (int, float)
                                   ), f"{value} is not a number"
                 return -1 * value
-            case PropertyAccessExpression(expression, property):
-                value = self.evaluate(expression, scope)
+            case PropertyAccessExpression(object=obj, property=property):
+                value = self.evaluate(obj, scope)
                 assert isinstance(value, dict), f"{value} is not a struct"
                 return value[property]
-            case FunctionCallExpression(object, args):
+            case FunctionCallExpression(object=object, args=args):
                 object_val = self.evaluate(object, scope)
                 assert isinstance(
                     object_val, Callable), f"{object_val} is not callable"
@@ -194,11 +196,11 @@ class Interpreter:
                     else:
                         kwd[arg.name] = self.evaluate(arg.value, scope)
                 return object_val(*pos, **kwd)
-            case IdentifierExpression(name):
+            case IdentifierExpression(name=name):
                 assert scope.rec_contains(
                     name), f"Undefined identifier: {name}"
                 return scope.rec_get(name)
-            case IfExpression(condition, then_block, else_ifs, else_block):
+            case IfExpression(condition=condition, body=then_block, else_ifs=else_ifs, else_block=else_block):
                 if self.evaluate(condition, scope):
                     return self.evaluate(then_block, scope)
                 for else_if in else_ifs:
@@ -206,15 +208,15 @@ class Interpreter:
                         return self.evaluate(else_if[1], scope)
                 if else_block:
                     return self.evaluate(else_block, scope)
-            case BlockExpression(statements):
+            case BlockExpression(body=statements):
                 inner_scope = scope.spawn_child()
                 last: RETURN_TYPE | None = None
                 for statement in statements:
                     last = self.execute(statement, inner_scope)
                 return last
-            case ArrayExpression(values):
+            case ArrayExpression(elements=values):
                 return [self.evaluate(value, scope) for value in values]
-            case RangeExpression(start, end, step):
+            case RangeExpression(left=start, right=end, step=step):
                 start_value = self.evaluate(start, scope)
                 end_value = self.evaluate(end, scope)
                 step_value = self.evaluate(step, scope)
