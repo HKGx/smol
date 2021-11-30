@@ -101,7 +101,7 @@ class Checker:
             case TypeBuiltInExpression("string"): return BuiltInType.string
             case TypeBuiltInExpression("bool"): return BuiltInType.bool
             case TypeBuiltInExpression("none"): return BuiltInType.none
-            case TypeIdentifierExpression(name):
+            case TypeIdentifierExpression(name=name):
                 if not scope.rec_contains(name):
                     self.error(f"Unknown type: {name}", t_expression)
                     return BuiltInType.invalid
@@ -110,7 +110,7 @@ class Checker:
                     self.error(f"Type {name} is not a struct", t_expression)
                     return BuiltInType.invalid
                 return typ
-            case TypeUnionExpression(union_types):
+            case TypeUnionExpression(elements=union_types):
                 types: set[CheckerType] = {self.evaluate_type(
                     t, scope) for t in union_types}  # type: ignore
                 if any(t is None for t in types):
@@ -143,20 +143,20 @@ class Checker:
                 return TypedExpression(BuiltInType.bool, expression)
             case StringExpression():
                 return TypedExpression(BuiltInType.string, expression)
-            case IdentifierExpression(name):
+            case IdentifierExpression(name=name):
                 if not scope.rec_contains(name):
                     self.error(
                         f"Identifier {name} is not defined in scope", expression)
                     return TypedExpression(BuiltInType.invalid, expression)
                 return TypedExpression(scope.rec_get(name), expression)
-            case EqualityExpression(left, sign, right):
+            case EqualityExpression(left=left, sing=sign, right=right):
                 l_typ, r_typ = self.lr_evaluate(left, right, scope)
                 if l_typ.type != r_typ.type:
                     self.error(
                         f"{expression} has different types: {l_typ.type} and {r_typ.type}", expression)
                     return TypedExpression(BuiltInType.invalid, expression)
                 return TypedExpression(BuiltInType.bool, expression)
-            case ComparisonExpression(left, sign, right):
+            case ComparisonExpression(left=left, sign=sign, right=right):
                 l_typ, r_typ = self.lr_evaluate(left, right, scope)
                 if l_typ.type != r_typ.type:
                     self.error(
@@ -164,7 +164,7 @@ class Checker:
                     return TypedExpression(BuiltInType.invalid, expression)
                 return TypedExpression(BuiltInType.bool, expression)
 
-            case AdditionExpression(left, sign,  right):
+            case AdditionExpression(left=left, sign=sign,  right=right):
                 l_typ, r_typ = self.lr_evaluate(left, right, scope)
                 match sign:
                     case "+":
@@ -182,7 +182,7 @@ class Checker:
                 self.error(
                     f"Invalid operation: {l_typ.type.name} {sign} {r_typ.type.name}", expression)
                 return TypedExpression(BuiltInType.invalid, expression)
-            case MultiplicationExpression(left, sign, right):
+            case MultiplicationExpression(left=left, sign=sign, right=right):
                 l_typ, r_typ = self.lr_evaluate(left, right, scope)
                 match (l_typ.type, r_typ.type):
                     case (BuiltInType.int, BuiltInType.int):
@@ -191,7 +191,7 @@ class Checker:
                 self.error(
                     f"Invalid operation: {l_typ.type.name} {sign} {r_typ.type.name}", expression)
                 return TypedExpression(BuiltInType.invalid, expression)
-            case ExponentiationExpression(left, sign, right):
+            case ExponentiationExpression(left=left, sign=sign, right=right):
                 l_typ, r_typ = self.lr_evaluate(left, right, scope)
                 match (l_typ.type, r_typ.type):
                     case (BuiltInType.int, BuiltInType.int):
@@ -200,7 +200,7 @@ class Checker:
                 self.error(
                     f"Invalid operation: {l_typ.type} {sign} {r_typ.type}", expression)
                 return TypedExpression(BuiltInType.invalid, expression)
-            case NegationExpression(inner_expr):
+            case NegationExpression(value=inner_expr):
                 typ = self.evaluate_type_expression(inner_expr, scope)
                 if typ.type != BuiltInType.int:
                     self.error(
@@ -208,7 +208,10 @@ class Checker:
                     )
                     return TypedExpression(BuiltInType.invalid, inner_expr)
                 return TypedExpression(BuiltInType.int, expression)
-            case IfExpression(condition, body, else_ifs, else_body):
+            case IfExpression(condition=condition,
+                              body=body,
+                              else_ifs=else_ifs,
+                              else_body=else_body):
                 condition_type = self.evaluate_type_expression(
                     condition, scope)
                 if condition_type.type != BuiltInType.bool:
@@ -257,7 +260,7 @@ class Checker:
                     return TypedExpression(BuiltInType.invalid, expression)
 
                 return TypedExpression(body_types[0], expression)
-            case ArrayExpression(elements):
+            case ArrayExpression(elements=elements):
                 elements = [self.evaluate_type_expression(
                     element, scope) for element in elements]
                 element_types = [element.type for element in elements]
@@ -267,7 +270,7 @@ class Checker:
                     return TypedExpression(ListType("list", element_types[0], len(element_types)), expression)
                 self.error("Invalid types of array elements", expression)
                 return TypedExpression(BuiltInType.invalid, expression)
-            case PropertyAccessExpression(obj, property):
+            case PropertyAccessExpression(object=obj, property=property):
                 typ = self.evaluate_type_expression(obj, scope)
                 if isinstance(typ.type, ModuleType):
                     if property in typ.type.types:
@@ -286,7 +289,7 @@ class Checker:
                         f"Invalid operation: {typ.type} has no property {property}", expression)
                     return TypedExpression(BuiltInType.invalid, expression)
                 return TypedExpression(member_typ.type, expression)
-            case FunctionCallExpression(object):
+            case FunctionCallExpression(object=object):
                 typ = self.evaluate_type_expression(object, scope)
                 function = typ.type
                 match function:
@@ -299,7 +302,7 @@ class Checker:
                             f"Invalid function call: {function.name} is not a valid function", expression)
                         return TypedExpression(BuiltInType.invalid, expression)
 
-            case BlockExpression(statements):
+            case BlockExpression(body=statements):
                 inner_scope = scope.spawn_child()
                 for statement in statements[:-1]:
                     self.check_statement(statement, inner_scope)
@@ -312,7 +315,7 @@ class Checker:
                 if stat_type == BuiltInType.none:
                     return TypedExpression(BuiltInType.none, expression)
                 return TypedExpression(stat_type, expression)
-            case RangeExpression(start, end, step):
+            case RangeExpression(left=start, right=end, step=step):
                 start_type = self.evaluate_type_expression(start, scope)
                 end_type = self.evaluate_type_expression(end, scope)
                 step_type = self.evaluate_type_expression(step, scope)
