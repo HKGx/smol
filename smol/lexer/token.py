@@ -51,16 +51,16 @@ class TokenType(Enum):
 
 @dataclass
 class Token:
-    type: TokenType
+    typ: TokenType
     image: str
     line: int
     column: int
 
     def match(self, *types: TokenType):
-        return self.type in types
+        return self.typ in types
 
     def __str__(self):
-        return (f"Token(type=<{self.type.name}>"
+        return (f"Token(type=<{self.typ.name}>"
                 f", image=`{self.image}`"
                 f", position=[{self.line}:{self.column}])")
 

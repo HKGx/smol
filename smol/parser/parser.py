@@ -173,14 +173,14 @@ class Parser:
 
     def exponentiation(self) -> Expression:
         lhs = self.negation()
-        while (not self.ended and self.current_token.type == TokenType.CARET):
+        while (not self.ended and self.current_token.typ == TokenType.CARET):
             self.next()
             lhs = ExponentiationExpression(
                 lhs, "^", self.exponentiation())  # it just works?
         return lhs
 
     def negation(self) -> Expression:
-        if self.current_token.type == TokenType.MINUS:
+        if self.current_token.typ == TokenType.MINUS:
             self.next()
             return NegationExpression(self.function_call())
         return self.function_call()
@@ -188,10 +188,10 @@ class Parser:
     def function_call(self) -> Expression:
         start = self.current_token
         object = self.property_access()
-        if self.ended or self.current_token.type != TokenType.LEFT_PAREN:
+        if self.ended or self.current_token.typ != TokenType.LEFT_PAREN:
             return object
         assert not self.ended, "Expected `(` but found `EOF`"
-        assert self.current_token.type == TokenType.LEFT_PAREN, "Expected '('"
+        assert self.current_token.typ == TokenType.LEFT_PAREN, "Expected '('"
         self.next()
         # parse arguments
         args: list[FunctionCallArgument] = []
@@ -205,23 +205,23 @@ class Parser:
                 case _:
                     args.append(self.function_call_argument())
         assert not self.ended, "Expected `)` but found `EOF`"
-        assert self.current_token.type == TokenType.RIGHT_PAREN, "Expected ')'"
+        assert self.current_token.typ == TokenType.RIGHT_PAREN, "Expected ')'"
         edges = self.edges(start)
         self.next()
         return FunctionCallExpression(object, args, edges=edges)
 
     def property_access(self) -> Expression:
         lhs = self.atomic()
-        while (not self.ended and self.current_token.type == TokenType.DOT):
+        while (not self.ended and self.current_token.typ == TokenType.DOT):
             self.next()
             assert not self.ended, f"Expected identifier after '.' but found `EOF`"
-            assert self.current_token.type == TokenType.IDENTIFIER_LITERAL, f"Expected identifier after '.' but found {self.current_token.image}"
+            assert self.current_token.typ == TokenType.IDENTIFIER_LITERAL, f"Expected identifier after '.' but found {self.current_token.image}"
             lhs = PropertyAccessExpression(lhs, self.current_token.image)
             self.next()
         return lhs
 
     def array_literal(self) -> Expression:
-        assert self.current_token.type == TokenType.LEFT_BRACKET
+        assert self.current_token.typ == TokenType.LEFT_BRACKET
         self.next()
         elements = []
         while not self.ended:
@@ -233,7 +233,7 @@ class Parser:
                     assert not self.ended, "Expected expression after comma"
                 case _:
                     elements.append(self.expression())
-                    assert self.current_token.type in (
+                    assert self.current_token.typ in (
                         TokenType.COMMA, TokenType.RIGHT_BRACKET), f"Expected comma or right bracket, but got {self.current_token.image}"
         assert False, "Unexpected end of file, expected closing `]`"
 
@@ -277,12 +277,12 @@ class Parser:
         return expr
 
     def do_block_expression(self) -> Expression:
-        assert self.current_token.type == TokenType.KEYWORD
+        assert self.current_token.typ == TokenType.KEYWORD
         assert self.current_token.image == "do"
         self.next()
         statements = []
         while not self.ended:
-            if self.current_token.type == TokenType.KEYWORD and self.current_token.image == "end":
+            if self.current_token.typ == TokenType.KEYWORD and self.current_token.image == "end":
                 self.next()
                 return BlockExpression(statements)
             statements.append(self.statement())
@@ -301,7 +301,7 @@ class Parser:
 
     def if_expression(self) -> Expression:
         # TODO: Investigate as there might be a bug with `end` keyword
-        assert self.current_token.type == TokenType.KEYWORD
+        assert self.current_token.typ == TokenType.KEYWORD
         assert self.current_token.image == "if"
         self.next()
         assert not self.ended, "Expected expression after `if` but found `EOF`"
@@ -327,17 +327,17 @@ class Parser:
         return IfExpression(condition, body, elifs, None)
 
     def parenthesized_expression(self) -> Expression:
-        assert self.current_token.type == TokenType.LEFT_PAREN, "Expected '('"
+        assert self.current_token.typ == TokenType.LEFT_PAREN, "Expected '('"
         self.next()
         expr = self.expression()
         assert not self.ended, "Expected ')' but found 'EOF'"
-        assert self.current_token.type == TokenType.RIGHT_PAREN, f"Expected ')' but found {self.current_token.image}"
+        assert self.current_token.typ == TokenType.RIGHT_PAREN, f"Expected ')' but found {self.current_token.image}"
         return expr
 
     def function_call_argument(self) -> FunctionCallArgument:
-        if self.current_token.type == TokenType.IDENTIFIER_LITERAL:
+        if self.current_token.typ == TokenType.IDENTIFIER_LITERAL:
             assert self.peek_next is not None, "Expected ?? but found EOF"
-            if self.peek_next.type == TokenType.DEFINE:
+            if self.peek_next.typ == TokenType.DEFINE:
                 name = self.current_token.image
                 self.next(2)
                 assert not self.ended, "Expected expression after `:=` but found `EOF`"
@@ -348,7 +348,7 @@ class Parser:
         return ExpressionStatement(self.expression())
 
     def while_statement(self) -> Statement:
-        assert self.current_token.type == TokenType.KEYWORD
+        assert self.current_token.typ == TokenType.KEYWORD
         assert self.current_token.image == "while"
         self.next()
         assert not self.ended, "Expected expression after `while` but found `EOF`"
@@ -358,15 +358,15 @@ class Parser:
         return WhileStatement(condition, body)
 
     def for_statement(self) -> Statement:
-        assert self.current_token.type == TokenType.KEYWORD
+        assert self.current_token.typ == TokenType.KEYWORD
         assert self.current_token.image == "for"
         self.next()
         assert not self.ended, "Expected identifier after `for` but found `EOF`"
-        assert self.current_token.type == TokenType.IDENTIFIER_LITERAL
+        assert self.current_token.typ == TokenType.IDENTIFIER_LITERAL
         var = IdentifierExpression(self.current_token.image)
         self.next()
         assert not self.ended, "Expected `in` but found `EOF`"
-        assert self.current_token.type == TokenType.KEYWORD and self.current_token.image == "in"
+        assert self.current_token.typ == TokenType.KEYWORD and self.current_token.image == "in"
         self.next()
         assert not self.ended, "Expected expression after `in` but found `EOF`"
         collection = self.expression()
@@ -375,24 +375,24 @@ class Parser:
 
     def assignment_statement(self) -> Statement:
         is_mutable = False
-        if self.current_token.type == TokenType.KEYWORD and self.current_token.image == "mut":
+        if self.current_token.typ == TokenType.KEYWORD and self.current_token.image == "mut":
             is_mutable = True
             self.next()
-        assert self.current_token.type == TokenType.KEYWORD, "Expected `let`"
+        assert self.current_token.typ == TokenType.KEYWORD, "Expected `let`"
         assert self.current_token.image == "let", "Expected `let`"
         self.next()
         assert not self.ended, "Expected identifier after `let` but found `EOF`"
-        assert self.current_token.type == TokenType.IDENTIFIER_LITERAL, "Expected identifier after `let` but found `{self.current_token.image}`"
+        assert self.current_token.typ == TokenType.IDENTIFIER_LITERAL, "Expected identifier after `let` but found `{self.current_token.image}`"
         identifier = IdentifierExpression(self.current_token.image)
         self.next()
         typ = TypeDeduceExpression()
-        if self.current_token.type == TokenType.COLON:
+        if self.current_token.typ == TokenType.COLON:
             self.next()
             assert not self.ended, "Expected type after `:` but found `EOF`"
             typ = self.type_expression()
 
         assert not self.ended, "Expected `:=` but found `EOF`"
-        assert self.current_token.type == TokenType.DEFINE, f"Expected `:=` but found {self.current_token.image}"
+        assert self.current_token.typ == TokenType.DEFINE, f"Expected `:=` but found {self.current_token.image}"
         self.next()
         assert not self.ended, "Expected expression after `:=` but found `EOF`"
         value = self.expression()
@@ -400,49 +400,49 @@ class Parser:
 
     def function_definition_statement(self) -> FunctionDefinitionStatement:
         # TODO: investigate whether this can be simplified
-        assert self.current_token.type == TokenType.KEYWORD
+        assert self.current_token.typ == TokenType.KEYWORD
         assert self.current_token.image == "fn"
         self.next()
         assert not self.ended, "Expected identifier after `fn` but found `EOF`"
-        assert self.current_token.type == TokenType.IDENTIFIER_LITERAL, "Expected identifier after `fn` but found `{self.current_token.image}`"
+        assert self.current_token.typ == TokenType.IDENTIFIER_LITERAL, "Expected identifier after `fn` but found `{self.current_token.image}`"
         name = self.current_token.image
         self.next()
         assert not self.ended, "Expected `(` but found `EOF`"
-        assert self.current_token.type == TokenType.LEFT_PAREN, "Expected '('"
+        assert self.current_token.typ == TokenType.LEFT_PAREN, "Expected '('"
         self.next()
         # parse arguments
         args: list[FunctionArgument] = []
         while not self.ended:
-            if self.current_token.type == TokenType.RIGHT_PAREN:
+            if self.current_token.typ == TokenType.RIGHT_PAREN:
                 break
-            if self.current_token.type == TokenType.COMMA:
+            if self.current_token.typ == TokenType.COMMA:
                 assert self.peek_next is not None, "Expected expression after `,` but found `EOF`"
-                assert self.peek_next.type != TokenType.RIGHT_PAREN, "Expected expression after `,` but found `)`"
-                assert self.peek_next.type != TokenType.COMMA, "Expected expression after `,` but found `,`"
+                assert self.peek_next.typ != TokenType.RIGHT_PAREN, "Expected expression after `,` but found `)`"
+                assert self.peek_next.typ != TokenType.COMMA, "Expected expression after `,` but found `,`"
                 self.next()
             else:
                 is_mutable = False
-                if self.current_token.type == TokenType.KEYWORD and self.current_token.image == "mut":
+                if self.current_token.typ == TokenType.KEYWORD and self.current_token.image == "mut":
                     is_mutable = True
                     self.next()
                 assert not self.ended, "Expected identifier but found `EOF`"
-                assert self.current_token.type == TokenType.IDENTIFIER_LITERAL, f"Expected identifier but found `{self.current_token.image}`"
+                assert self.current_token.typ == TokenType.IDENTIFIER_LITERAL, f"Expected identifier but found `{self.current_token.image}`"
                 image = self.current_token.image
                 self.next()
                 assert not self.ended, "Expected `:` but found `EOF`"
-                assert self.current_token.type == TokenType.COLON, "Expected `:`"
+                assert self.current_token.typ == TokenType.COLON, "Expected `:`"
                 self.next()
                 assert not self.ended, "Expected type but found `EOF`"
                 typ = self.type_expression()
                 assert not self.ended, "Expected `)` but found `EOF`"
                 default_value: Expression | None = None
-                if self.current_token.type == TokenType.DEFINE:
+                if self.current_token.typ == TokenType.DEFINE:
                     self.next()
                     assert not self.ended, "Expected expression after `:=` but found `EOF`"
                     default_value = self.expression()
                 args.append(FunctionArgument(
                     image, typ, is_mutable, default_value))
-        assert self.current_token.type == TokenType.RIGHT_PAREN, "Expected ')', unterminated function definition"
+        assert self.current_token.typ == TokenType.RIGHT_PAREN, "Expected ')', unterminated function definition"
         self.next()
         assert not self.ended, "Expected type but found `EOF`"
         typ = TypeDeduceExpression()
@@ -456,15 +456,15 @@ class Parser:
 
     def struct_member(self) -> StructField:
         is_mutable = False
-        if self.current_token.type == TokenType.KEYWORD and self.current_token.image == "mut":
+        if self.current_token.typ == TokenType.KEYWORD and self.current_token.image == "mut":
             self.next()
             is_mutable = True
         assert not self.ended, "Expected identifier but found `EOF`"
-        assert self.current_token.type == TokenType.IDENTIFIER_LITERAL
+        assert self.current_token.typ == TokenType.IDENTIFIER_LITERAL
         name = self.current_token.image
         self.next()
         assert not self.ended, "Expected `:` but found `EOF`"
-        assert self.current_token.type == TokenType.COLON, "Expected `:`"
+        assert self.current_token.typ == TokenType.COLON, "Expected `:`"
         self.next()
         assert not self.ended, "Expected type but found `EOF`"
         typ = self.type_expression()
@@ -472,17 +472,17 @@ class Parser:
 
     def struct_method(self) -> StructMethod:
         assert not self.ended, "Expected identifier but found `EOF`"
-        assert self.current_token.type == TokenType.KEYWORD, f"Expected `fn` but found `{self.current_token.image}`"
+        assert self.current_token.typ == TokenType.KEYWORD, f"Expected `fn` but found `{self.current_token.image}`"
         assert self.current_token.image == "fn", f"Expected `fn` but found `{self.current_token.image}`"
         func_def = self.function_definition_statement()
         return StructMethod.from_function(func_def)
 
     def struct_definition_statement(self) -> Statement:
-        assert self.current_token.type == TokenType.KEYWORD
+        assert self.current_token.typ == TokenType.KEYWORD
         assert self.current_token.image == "struct"
         self.next()
         assert not self.ended, "Expected identifier after `struct` but found `EOF`"
-        assert self.current_token.type == TokenType.IDENTIFIER_LITERAL, f"Expected identifier after `struct` but found `{self.current_token.image}`"
+        assert self.current_token.typ == TokenType.IDENTIFIER_LITERAL, f"Expected identifier after `struct` but found `{self.current_token.image}`"
         name = self.current_token.image
         self.next()
         assert not self.ended, "Expected member or end of struct but found `EOF`"
@@ -505,17 +505,17 @@ class Parser:
         return statement
 
     def import_statement(self) -> Statement:
-        assert self.current_token.type == TokenType.KEYWORD
+        assert self.current_token.typ == TokenType.KEYWORD
         assert self.current_token.image == "import"
         self.next()
         assert not self.ended, "Expected identifier after `import` but found `EOF`"
-        assert self.current_token.type == TokenType.IDENTIFIER_LITERAL, f"Expected identifier after `import` but found `{self.current_token.image}`"
+        assert self.current_token.typ == TokenType.IDENTIFIER_LITERAL, f"Expected identifier after `import` but found `{self.current_token.image}`"
         name = self.current_token.image
         self.next()
-        while (not self.ended and self.current_token.type == TokenType.DOT):
+        while (not self.ended and self.current_token.typ == TokenType.DOT):
             self.next()
             assert not self.ended, "Expected identifier after '.'"
-            assert self.current_token.type == TokenType.IDENTIFIER_LITERAL, "Expected identifier after '.'"
+            assert self.current_token.typ == TokenType.IDENTIFIER_LITERAL, "Expected identifier after '.'"
             name += f".{self.current_token.image}"
             self.next()
         statement = ImportStatement(name)

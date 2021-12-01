@@ -79,7 +79,7 @@ class Lexer:
             self.increment()
         image = self.source[start: self.current_source_idx]
         return Token(
-            type=TokenType.INTEGER_LITERAL,
+            typ=TokenType.INTEGER_LITERAL,
             image=self.source[start: self.current_source_idx],
             line=self.current_line,
             column=self.current_column - len(image),
@@ -151,7 +151,7 @@ class Lexer:
         assert self.current_character == '"', "Unterminated string literal"
         self.increment()
         return Token(
-            type=TokenType.STRING_LITERAL,
+            typ=TokenType.STRING_LITERAL,
             image=content,
             line=self.current_line,
             column=self.current_column - start,
@@ -173,7 +173,7 @@ class Lexer:
         if image in ("true", "false"):
             typ = TokenType.BOOLEAN_LITERAL
         return Token(
-            type=typ,
+            typ=typ,
             image=image,
             line=self.current_line,
             column=self.current_column - len(image),
@@ -201,7 +201,7 @@ class Lexer:
                         assert self.peek is not None
                         self._tokens.append(
                             Token(
-                                type=TokenType(
+                                typ=TokenType(
                                     self.current_character + self.peek),
                                 image=self.current_character + self.peek,
                                 line=self.current_line,
@@ -212,7 +212,7 @@ class Lexer:
                     case _:
                         self._tokens.append(
                             Token(
-                                type=TokenType(self.current_character),
+                                typ=TokenType(self.current_character),
                                 image=self.current_character,
                                 line=self.current_line,
                                 column=self.current_column - 1,
