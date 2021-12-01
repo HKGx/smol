@@ -15,4 +15,4 @@ let g := "a\x1F603" # "a😃"
 # Test \x escape
 let h := "a\x" # "ax"
 
-for i in [a, b, c, d, e, f, g, h] do print("\n\n") print(i) end
+for i in [a, b, c, d, e, f, g, h] do print("------------------") print(i) end
