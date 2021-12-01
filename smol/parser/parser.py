@@ -74,19 +74,36 @@ class Parser:
 
     def type_union_expression(self) -> TypeExpression:
         start = self.current_token
-        expr = self.type_atomic()
+        expr = self.type_array_expression()
         assert not self.ended, "Expected expression after 'or'"
         exprs: list[TypeExpression] = [expr]
         while not self.ended:
             match self.current_token:
                 case Token(TokenType.KEYWORD, "or"):
                     self.next()
-                    exprs.append(self.type_atomic())
+                    exprs.append(self.type_array_expression())
                 case _:
                     break
         if len(exprs) == 1:
             return expr
         return TypeUnionExpression(exprs, edges=self.edges(start))
+
+    def type_array_expression(self) -> TypeExpression:
+        start = self.current_token
+        expr = self.type_atomic()
+        if not self.ended and self.current_token.match(TokenType.LEFT_BRACKET):
+            self.next()
+            length = None
+            assert not self.ended, f"Expected `]` or length but got EOF"
+            if self.current_token.match(TokenType.INTEGER_LITERAL):
+                length = int(self.current_token.image)
+                self.next()
+            assert not self.ended, f"Expected `]` but got EOF"
+            assert self.current_token.match(
+                TokenType.RIGHT_BRACKET), f"Expected `]` but got {self.current_token.image}"
+            self.next()
+            return TypeArrayExpression(expr, length, edges=self.edges(start))
+        return expr
 
     def type_atomic(self) -> TypeExpression:
         assert not self.ended, "Expected type but got EOF"

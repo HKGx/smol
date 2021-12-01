@@ -135,8 +135,8 @@ class TypeIdentifierExpression(TypeExpression):
 
 @dataclass
 class TypeArrayExpression(TypeExpression):
-    # TODO: implement this
     element: TypeExpression
+    length: int | None
 
 
 @dataclass
