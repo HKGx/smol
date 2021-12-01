@@ -4,38 +4,6 @@ from smol.parser.utils import Expression, Statement
 
 
 @dataclass
-class IntegerExpression(Expression):
-    value: int
-
-
-@dataclass
-class IdentifierExpression(Expression):
-    name: str
-
-
-@dataclass
-class BooleanExpression(Expression):
-    value: bool
-
-
-@dataclass
-class StringExpression(Expression):
-    value: str
-
-
-@dataclass
-class ArrayExpression(Expression):
-    elements: list[Expression]
-
-
-@dataclass
-class RangeExpression(Expression):
-    left: Expression
-    right: Expression
-    step: Expression
-
-
-@dataclass
 class EqualityExpression(Expression):
     left: Expression
     sign: Literal['=='] | Literal['!=']
@@ -47,6 +15,13 @@ class ComparisonExpression(Expression):
     left: Expression
     sign: Literal['<'] | Literal[">"] | Literal[">="] | Literal["<="]
     right: Expression
+
+
+@dataclass
+class RangeExpression(Expression):
+    left: Expression
+    right: Expression
+    step: Expression
 
 
 @dataclass
@@ -76,12 +51,6 @@ class NegationExpression(Expression):
 
 
 @dataclass
-class PropertyAccessExpression(Expression):
-    object: Expression
-    property: str
-
-
-@dataclass
 class FunctionCallArgument:
     name: str | None
     value: Expression
@@ -91,6 +60,37 @@ class FunctionCallArgument:
 class FunctionCallExpression(Expression):
     object: Expression  # object which is being called
     args: list[FunctionCallArgument]
+
+
+@dataclass
+class PropertyAccessExpression(Expression):
+    object: Expression
+    property: str
+
+
+@dataclass
+class ArrayExpression(Expression):
+    elements: list[Expression]
+
+
+@dataclass
+class IntegerExpression(Expression):
+    value: int
+
+
+@dataclass
+class IdentifierExpression(Expression):
+    name: str
+
+
+@dataclass
+class BooleanExpression(Expression):
+    value: bool
+
+
+@dataclass
+class StringExpression(Expression):
+    value: str
 
 
 @dataclass
@@ -115,6 +115,8 @@ class BreakExpression(Expression):
 class ContinueExpression(Expression):
     pass
 
+
+# Type Expressions
 
 @dataclass
 class TypeExpression(Expression):
