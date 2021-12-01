@@ -21,10 +21,19 @@ class Parser:
     This can be then fed into Checker or Interpreter.
     """
     tokens: list[Token]
-    structs: list[StructDefinitionStatement] = []
-    functions: list[FunctionDefinitionStatement] = []
-    imports: list[ImportStatement] = []
+    structs: list[StructDefinitionStatement]
+    functions: list[FunctionDefinitionStatement]
+    imports: list[ImportStatement]
     current: int = 0
+
+    def __init__(self, tokens: list[Token]):
+        self.tokens = tokens
+        self.structs = []
+        self.functions = []
+        self.imports = [
+            ImportStatement("std.std", add_to_scope=True)
+        ]
+        self.current = 0
 
     @classmethod
     def from_lexer(cls, lexer: Lexer) -> "Parser":
@@ -53,13 +62,6 @@ class Parser:
     @property
     def ended(self):
         return self.current >= len(self.tokens)
-
-    def __init__(self, tokens: list[Token]):
-        self.tokens = tokens
-        self.structs = []
-        self.functions = []
-        self.imports = []
-        self.current = 0
 
     def next(self, increment: int = 1):
         self.current += increment
@@ -91,8 +93,6 @@ class Parser:
         expr: TypeExpression
         edges = self.edges(self.current_token)
         match (self.current_token):
-            case Token(TokenType.IDENTIFIER_LITERAL, "int" | "string" | "bool" | "none" as name):
-                expr = TypeBuiltInExpression(name, edges=edges)
             case Token(TokenType.IDENTIFIER_LITERAL, name):
                 expr = TypeIdentifierExpression(name, edges=edges)
             case _:
@@ -186,7 +186,7 @@ class Parser:
         return self.function_call()
 
     def function_call(self) -> Expression:
-
+        start = self.current_token
         object = self.property_access()
         if self.ended or self.current_token.type != TokenType.LEFT_PAREN:
             return object
@@ -206,15 +206,16 @@ class Parser:
                     args.append(self.function_call_argument())
         assert not self.ended, "Expected `)` but found `EOF`"
         assert self.current_token.type == TokenType.RIGHT_PAREN, "Expected ')'"
+        edges = self.edges(start)
         self.next()
-        return FunctionCallExpression(object, args)
+        return FunctionCallExpression(object, args, edges=edges)
 
     def property_access(self) -> Expression:
         lhs = self.atomic()
         while (not self.ended and self.current_token.type == TokenType.DOT):
             self.next()
-            assert not self.ended, "Expected identifier after '.'"
-            assert self.current_token.type == TokenType.IDENTIFIER_LITERAL, "Expected identifier after '.'"
+            assert not self.ended, f"Expected identifier after '.' but found `EOF`"
+            assert self.current_token.type == TokenType.IDENTIFIER_LITERAL, f"Expected identifier after '.' but found {self.current_token.image}"
             lhs = PropertyAccessExpression(lhs, self.current_token.image)
             self.next()
         return lhs
@@ -237,6 +238,7 @@ class Parser:
         assert False, "Unexpected end of file, expected closing `]`"
 
     def atomic(self) -> Expression:
+        start = self.current_token
         expr: Expression
         match self.current_token:
             case Token(TokenType.KEYWORD, "break"):
@@ -258,8 +260,7 @@ class Parser:
             case Token(TokenType.STRING_LITERAL):
                 expr = StringExpression(self.current_token.image)
             case Token(TokenType.IDENTIFIER_LITERAL):
-                expr = IdentifierExpression(
-                    self.current_token.image, edges=self.edges(self.current_token))
+                expr = IdentifierExpression(self.current_token.image)
             case _:
                 # TODO: improve error reporting
                 start = max(0, self.current - 10)
@@ -271,6 +272,8 @@ class Parser:
                 """)
         if not isinstance(expr, (BlockExpression, IfExpression)):
             self.next()
+        edges = self.edges(start)
+        expr.edges = edges
         return expr
 
     def do_block_expression(self) -> Expression:
