@@ -164,7 +164,7 @@ class Interpreter:
                 assert scope.rec_contains(
                     name), f"Undefined identifier: {name}"
                 return scope.rec_get(name)
-            case IfExpression(condition=condition, body=then_block, else_ifs=else_ifs, else_block=else_block):
+            case IfExpression(condition=condition, body=then_block, else_ifs=else_ifs, else_body=else_block):
                 if self.evaluate(condition, scope):
                     return self.evaluate(then_block, scope)
                 for else_if in else_ifs:
