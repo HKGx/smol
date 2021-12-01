@@ -136,10 +136,10 @@ class Checker:
         # TODO: Improve upon errors as they're really confusing
         if scope is None:
             scope = self.scope
-        bool_type = self.scope.rec_get("bool")
-        int_type = self.scope.rec_get("int")
-        string_type = self.scope.rec_get("string")
-        none_type = self.scope.rec_get("none")
+        bool_type = scope.rec_get("bool")
+        int_type = scope.rec_get("int")
+        string_type = scope.rec_get("string")
+        none_type = scope.rec_get("none")
         match expression:
             case IntegerExpression():
                 return TypedExpression(int_type, expression)
@@ -153,13 +153,12 @@ class Checker:
                         f"Identifier {name} is not defined in scope", expression)
                     return TypedExpression(INVALID_TYPE, expression)
                 return TypedExpression(scope.rec_get(name), expression)
-            case EqualityExpression(left=left, sing=sign, right=right):
+            case EqualityExpression(left=left, sign=sign, right=right):
                 l_typ, r_typ = self.lr_evaluate(left, right, scope)
                 if l_typ.type != r_typ.type:
                     self.error(
                         f"{expression} has different types: {l_typ.type} and {r_typ.type}", expression)
                     return TypedExpression(INVALID_TYPE, expression)
-
                 return TypedExpression(bool_type, expression)
             case ComparisonExpression(left=left, sign=sign, right=right):
                 l_typ, r_typ = self.lr_evaluate(left, right, scope)
@@ -684,7 +683,7 @@ class Checker:
             return TypedStatement(INVALID_TYPE, statement)
         if statement.add_to_scope:
             for name, typ in module.types.items():
-                if scope.rec_get(name):
+                if scope.rec_contains(name):
                     self.error(
                         f"Name {name} is already defined. Cannot import {statement.name}")
                     return TypedStatement(INVALID_TYPE, statement)
