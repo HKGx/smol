@@ -154,12 +154,15 @@ class Parser:
         return lhs
 
     def addition(self) -> Expression:
+        start = self.current_token
         lhs = self.multiplication()
         while (not self.ended and self.current_token.match(TokenType.PLUS, TokenType.MINUS)):
             assert self.current_token.image == "+" or self.current_token.image == "-"
             sign: Literal["+"] | Literal["-"] = self.current_token.image
             self.next()
-            lhs = AdditionExpression(lhs, sign, self.multiplication())
+            edges = self.edges(start)
+            lhs = AdditionExpression(
+                lhs, sign, self.multiplication(), edges=edges)
         return lhs
 
     def multiplication(self) -> Expression:
@@ -211,23 +214,27 @@ class Parser:
         return FunctionCallExpression(object, args, edges=edges)
 
     def property_access(self) -> Expression:
+        start = self.current_token
         lhs = self.atomic()
         while (not self.ended and self.current_token.typ == TokenType.DOT):
             self.next()
             assert not self.ended, f"Expected identifier after '.' but found `EOF`"
             assert self.current_token.typ == TokenType.IDENTIFIER_LITERAL, f"Expected identifier after '.' but found {self.current_token.image}"
-            lhs = PropertyAccessExpression(lhs, self.current_token.image)
+            edges = self.edges(start)
+            lhs = PropertyAccessExpression(
+                lhs, self.current_token.image, edges=edges)
             self.next()
         return lhs
 
     def array_literal(self) -> Expression:
+        start = self.current_token
         assert self.current_token.typ == TokenType.LEFT_BRACKET
         self.next()
         elements = []
         while not self.ended:
             match self.current_token:
                 case Token(TokenType.RIGHT_BRACKET):
-                    return ArrayExpression(elements)
+                    return ArrayExpression(elements, edges=self.edges(start))
                 case Token(TokenType.COMMA):
                     self.next()
                     assert not self.ended, "Expected expression after comma"
@@ -270,9 +277,13 @@ class Parser:
                 Expected integer, identifier, function call or `(` but got `{self.current_token.image}` at {self.current_token.line}:{self.current_token.column}.
                 {" ".join(last_tokens_images)}
                 """)
+        edges = None
+        if not self.ended:
+            # FIXME: sometimes self.current_token is outside the bounds of self.tokens
+            # this is a bit of a hack, need to be fixed
+            edges = self.edges(start)
         if not isinstance(expr, (BlockExpression, IfExpression)):
             self.next()
-        edges = self.edges(start)
         expr.edges = edges
         return expr
 
