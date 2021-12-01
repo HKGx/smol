@@ -35,3 +35,16 @@ def iopen_file(path: str) -> dict[str, Any]:
 
 def ishell(cmd: str) -> None:
     os.system(cmd)
+
+
+MODULE_DEFS = {
+    "std.file": {
+        "close_file": lambda file: file["close"](),
+        "open_file": iopen_file,
+        "read_file": lambda file: file["read"](),
+        "seek_file": (lambda file, offset: file["seek"](offset)),
+    },
+    "std.os": {
+        "shell": ishell,
+    }
+}

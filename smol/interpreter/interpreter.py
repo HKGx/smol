@@ -3,7 +3,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 import os
 from typing import Any, Callable
-from smol.interpreter.utils import RETURN_TYPE, BreakException, ContinueException, iopen_file, iprint, ishell, istr
+from smol.interpreter.utils import MODULE_DEFS, RETURN_TYPE, BreakException, ContinueException, iopen_file, iprint, ishell, istr
 
 from smol.parser.expressions import *
 from smol.parser.parser import Parser, Program
@@ -46,19 +46,9 @@ class Interpreter:
         return struct_fn
 
     def import_(self, name: str) -> dict[str, RETURN_TYPE]:
-        # TODOOOOO: Get rid of this hack
-        if name in ("std.file"):
-            return {
-                "File": self.struct(),
-                "close_file": lambda file: file["close"](),
-                "open_file": iopen_file,
-                "read_file": lambda file: file["read"](),
-                "seek_file": lambda file, offset: file["seek"](offset),
-            }  # type: ignore
-        if name in ("std.os"):
-            return {
-                "shell": ishell
-            }  # type: ignore
+        # TODO: It's still a hack, but it's a better one
+        if name in MODULE_DEFS:
+            return MODULE_DEFS[name]
         if name in self.context.import_stack:
             raise ImportError(f"Recursive import: {name}")
         if name in self.context.module_cache:
