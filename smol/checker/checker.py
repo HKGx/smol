@@ -60,7 +60,7 @@ class Checker:
         self.check_program(self.program)
         return self._errors
 
-    @ property
+    @property
     def has_errors(self):
         return len(self._errors) > 0
 
@@ -116,6 +116,13 @@ class Checker:
                 name = "|".join(t.name for t in types if t is not None)
                 return UnionType(name, tuple(types))
             case TypeDeduceExpression(): return None
+            case TypeArrayExpression(element=element_type, length=length):
+                element_type = self.evaluate_type(element_type, scope)
+                if element_type is None:
+                    self.error(f"Invalid array element type", t_expression)
+                    return INVALID_TYPE
+                return ListType("list", element_type, length)
+
         raise NotImplementedError(
             f"Unsupported type expression: {t_expression}")
 
@@ -127,7 +134,14 @@ class Checker:
             return typ1.name == typ2.name  # THIS IS DANGEROUS! FIXME LATER
         if isinstance(typ1, UnionType) and isinstance(typ2, UnionType):
             return all(self.type_equal(t1, t2) for t1, t2 in zip(typ1.types, typ2.types))
-
+        if isinstance(typ1, ListType) and isinstance(typ2, ListType):
+            if typ1.known_length is None and typ2.known_length is None:
+                return self.type_equal(typ1.inner_type, typ2.inner_type)
+            if typ1.known_length is not None and typ2.known_length is not None:
+                return typ1.known_length == typ2.known_length and self.type_equal(
+                    typ1.inner_type, typ2.inner_type)
+            if typ1.known_length is None and typ2.known_length is not None:
+                return self.type_equal(typ1.inner_type, typ2.inner_type)
         if isinstance(typ1, UnionType) and typ2 in typ1.types:
             return True
         return False
@@ -272,6 +286,43 @@ class Checker:
                         f"Invalid property access: {property} is not a valid property of {typ.type.name}", expression
                     )
                     return TypedExpression(INVALID_TYPE, expression)
+                if isinstance(typ.type, ListType):
+                    # TODO: implement that properly in the future
+                    if property == "length":
+                        return TypedExpression(int_type, expression)
+                    if property == "push":
+                        if not typ.type.meta.get("mut"):
+                            self.error(
+                                f"Invalid property access: `{property}` doesn't exist on immutable lists", expression
+                            )
+                            return TypedExpression(INVALID_TYPE, expression)
+
+                        push_type = FunctionType(
+                            "push",
+                            (FunctionArgumentType("value", typ.type.inner_type),),
+                            none_type
+                        )
+                        return TypedExpression(push_type, expression)
+                    if property == "get":
+                        get_type = FunctionType(
+                            "get",
+                            (FunctionArgumentType("index", int_type),),
+                            typ.type.inner_type
+                        )
+                        return TypedExpression(get_type, expression)
+                    if property == "set":
+                        if not typ.type.meta.get("mut"):
+                            self.error(
+                                f"Invalid property access: `{property}` doesn't exist on immutable lists", expression
+                            )
+                            return TypedExpression(INVALID_TYPE, expression)
+                        set_type = FunctionType(
+                            "set",
+                            (FunctionArgumentType("index", int_type),
+                             FunctionArgumentType("value", typ.type.inner_type)),
+                            none_type
+                        )
+                        return TypedExpression(set_type, expression)
                 if not isinstance(typ.type, StructType):
                     self.error(
                         f"Invalid operation: {typ.type} has no property {property}", expression)
@@ -372,6 +423,7 @@ class Checker:
                 self.error(
                     f"Invalid function call: {function.name} is not a valid function")
                 return TypedExpression(INVALID_TYPE, expression)
+
         return TypedExpression(function.to_type, expression)
 
     def check_expr_statement(self, statement: ExpressionStatement, scope: Scope) -> TypedStatement:
@@ -459,7 +511,7 @@ class Checker:
         inner_scope = scope.spawn_child()
 
         # pylint: disable=no-member
-        inner_scope.rec_set(ident_name, iterable_type.type)
+        inner_scope.rec_set(ident_name, iterable_type.inner_type)
         self.evaluate_type_expression(body, inner_scope)
         return TypedStatement(none_type, statement)
 
@@ -621,7 +673,7 @@ class Checker:
             return_typ = self.evaluate_type(method.return_type, scope)
             if return_typ is None:
                 return_typ = scope.rec_get("none")
-            if not self.type_equal(typ.type, return_typ):
+            if not self.type_equal(return_typ, typ.type):
                 self.error(
                     f"Invalid struct definition: Method {method.name} has invalid return type!")
                 return TypedStatement(INVALID_TYPE, statement)

@@ -18,7 +18,7 @@ class InvalidType(CheckerType):
 
 @dataclass(eq=True, frozen=True)
 class ListType(CheckerType):
-    type: CheckerType
+    inner_type: CheckerType
     known_length: Optional[int]
 
 
