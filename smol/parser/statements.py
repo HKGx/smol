@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from smol.parser.expressions import IdentifierExpression, TypeExpression
 from smol.parser.utils import Expression, Statement
 
@@ -72,3 +72,4 @@ class StructDefinitionStatement(Statement):
 @dataclass
 class ImportStatement(Statement):
     name: str
+    add_to_scope: bool = field(default=False, kw_only=True)
