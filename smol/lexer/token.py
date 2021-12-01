@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from enum import Enum, auto
-from functools import lru_cache
+from functools import cache
 
 
 class TokenType(Enum):
@@ -42,7 +42,7 @@ class TokenType(Enum):
     KEYWORD = auto()
 
     @staticmethod
-    @lru_cache
+    @cache
     def first_characters() -> list[str]:
         return [
             str(t.value)[0] for t in TokenType.__members__.values() if not isinstance(t.value, int)
