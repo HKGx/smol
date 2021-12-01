@@ -31,7 +31,9 @@ struct string
     end
 end
 
-fn print(s: string) do
+
+fn print(s: string) do 
+    # TODO: print to stdout, do not rely on the interpreter
 end
 
 # TODO: Implement this the right way
