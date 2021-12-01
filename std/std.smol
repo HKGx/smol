@@ -1,2 +1,31 @@
-struct Foo 
+struct none 
+end
+
+struct int
+end
+
+struct float
+end
+
+struct bool
+end
+
+struct string 
+    value: string # DO NOT USE DIRECTLY, STILL IN DEVELOPMENT, USE `self`
+
+    fn repeat(times: int) string do
+        mut let s: string := self
+        for _ in 0..times do 
+            let s := s + self
+        end
+        s
+    end
+end
+
+fn print(s: string) do
+end
+
+# TODO: Implement this the right way
+fn str(s: int or string or bool or none) string do
+    ""
 end
