@@ -199,6 +199,27 @@ class Interpreter:
 
             case PropertyAccessExpression(object=obj, property=property):
                 value = self.evaluate(obj, scope)
+                if isinstance(value, list):
+                    # TODO: don't use interpreter magic in future
+                    if property == "length":
+                        return int_c(value=len(value))
+                    if property == "push":
+                        def ipush(to_push):
+                            value.append(to_push)
+                        return ipush  # type: ignore
+                    if property == "set":
+                        def iset(index, to_set):
+                            assert self.typeof(
+                                index) == "int", f"{self.typeof(index)} is not int"
+                            value[index["value"]] = to_set
+                        return iset  # type: ignore
+                    if property == "get":
+                        def iget(index):
+                            assert self.typeof(
+                                index) == "int", f"{self.typeof(index)} is not int"
+                            return value[index["value"]]
+                        return iget  # type: ignore
+
                 assert isinstance(value, dict), f"{value} is not a struct"
                 return value[property]
             case FunctionCallExpression(object=object, args=args):
