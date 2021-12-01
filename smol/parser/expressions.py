@@ -127,11 +127,6 @@ class TypeDeduceExpression(TypeExpression):
 
 
 @dataclass
-class TypeBuiltInExpression(TypeExpression):
-    name: Literal["int"] | Literal["string"] | Literal["bool"] | Literal["none"]
-
-
-@dataclass
 class TypeIdentifierExpression(TypeExpression):
     name: str
 
