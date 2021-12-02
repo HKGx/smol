@@ -40,7 +40,7 @@ def overwrite_module(interpreter: "Interpreter", name: str) -> None:
 
             def iread():
                 s = string_type()
-                s["__value__"] = file.read()
+                s["__value__"] = file["__file__"].read()
                 return s
             file["__file__"] = open(path["__value__"], "r")  # type: ignore
             file["read"] = iread
