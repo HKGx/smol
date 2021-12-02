@@ -1,6 +1,6 @@
-struct none 
-end
 
+struct none
+end
 # Do not use `.value` on any of the structs.
 # `.value` holds the internal value of the struct, and is only used for
 # interpreter.
@@ -8,19 +8,15 @@ end
 
 
 struct int
-    value: int
 end
 
 struct float
-    value: float
 end
 
 struct bool
-    value: bool
 end
 
 struct string 
-    value: string
 
     fn repeat(times: int) string do
         mut let s: string := self

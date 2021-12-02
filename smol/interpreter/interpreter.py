@@ -29,31 +29,40 @@ class InterpreterContext(StageContext):
 def overwrite_module(interpreter: "Interpreter", name: str) -> None:
     # FIXME: it's a mess, but it works for now
     # We need a way to directly use native code with auto-conversion
-    string_type = interpreter.scope.rec_get("string")
+
     if name == "std.file":
 
         file_struct = interpreter.scope.rec_get("File")
+        string_type = interpreter.scope.rec_get("string")
 
         def iopen(path: RETURN_TYPE):
             file = file_struct(path=path)
-            file["__file__"] = open(path["value"], "r")  # type: ignore
-            file["read"] = lambda: string_type(
-                value=file["__file__"].read())  # type: ignore
+
+            def iread():
+                s = string_type()
+                s["__value__"] = file.read()
+                return s
+            file["__file__"] = open(path["__value__"], "r")  # type: ignore
+            file["read"] = iread
             file["seek"] = lambda i: file["__file__"].seek(
-                i["value"])  # type: ignore
+                i["__value__"])  # type: ignore
             file["close"] = lambda: file["__file__"].close()  # type: ignore
             return file
         interpreter.scope.rec_set("open_file", iopen)
     if name == "std.os":
         def ishell(value: RETURN_TYPE):
-            os.system(value["value"])  # type: ignore
+            os.system(value["__value__"])  # type: ignore
         interpreter.scope.rec_set("shell", ishell)
     if name == "std.std":
+        string_type = interpreter.scope.rec_get("string")
+
         def istr(value: RETURN_TYPE):
-            return string_type(value=str(value["value"]))  # type: ignore
+            s = string_type()
+            s["__value__"] = value["__value__"]  # type: ignore
+            return s
 
         def iprint(value: RETURN_TYPE):
-            print(value["value"])  # type: ignore
+            print(value["__value__"])  # type: ignore
         interpreter.scope.rec_set("str", istr)
         interpreter.scope.rec_set("print", iprint)
 
@@ -118,53 +127,70 @@ class Interpreter:
         float_c = scope.rec_get("float")
         string_c = scope.rec_get("string")
         none_c = scope.rec_get("none")
+        v_prop = "__value__"
         match expression:
             case IntegerExpression():
-                return int_c(value=expression.value)
+                i = int_c()
+                i["__value__"] = expression.value  # type: ignore
+                return i
             case StringExpression():
-                return string_c(value=expression.value)
+                s = string_c()
+                s["__value__"] = expression.value  # type: ignore
+                return s
             case BooleanExpression():
-                return bool_c(value=expression.value)
+                b = bool_c()
+                b["__value__"] = expression.value  # type: ignore
+                return b
             case ExponentiationExpression(left=left, sign=sign, right=right):
                 lhs, rhs = self.lr_evaluate(left, right, scope)
-                l_val, r_val = lhs["value"], rhs["value"]  # type: ignore
+                l_val, r_val = lhs[v_prop], rhs[v_prop]  # type: ignore
                 assert self.typeof(
                     lhs) == "int", f"{self.typeof(lhs)} is not int"
                 assert self.typeof(
                     rhs) == "int", f"{self.typeof(rhs)} is not int"
-                return int_c(value=l_val ** r_val)  # type: ignore
+                i = int_c()
+                i["__value__"] = l_val ** r_val  # type: ignore
+                return i
             case MultiplicationExpression(left=left, sign=sign, right=right):
                 lhs, rhs = self.lr_evaluate(left, right, scope)
-                l_val, r_val = lhs["value"], rhs["value"]  # type: ignore
+                l_val, r_val = lhs[v_prop], rhs[v_prop]  # type: ignore
                 assert self.typeof(
                     lhs) == "int", f"{self.typeof(lhs)} is not int"
                 assert self.typeof(
                     rhs) == "int", f"{self.typeof(rhs)} is not int"
-
+                i = int_c()
                 if sign == "*":
-                    return int_c(value=l_val * r_val)  # type: ignore
-                return int_c(value=l_val // r_val)  # type: ignore
+                    i["__value__"] = l_val * r_val  # type: ignore
+                elif sign == "/":
+                    i["__value__"] = l_val // r_val  # type: ignore
+                return i
 
             case AdditionExpression(left=left, sign=sign, right=right):
                 lhs, rhs = self.lr_evaluate(left, right, scope)
-                l_val, r_val = lhs["value"], rhs["value"]  # type: ignore
+                l_val, r_val = lhs[v_prop], rhs[v_prop]  # type: ignore
                 if sign == "-":
                     assert self.typeof(
                         lhs) == "int", f"{self.typeof(lhs)} is not int"
                     assert self.typeof(
                         rhs) == "int", f"{self.typeof(rhs)} is not int"
-                    return int_c(value=l_val - r_val)   # type: ignore
+                    i = int_c()
+                    i["__value__"] = l_val - r_val  # type: ignore
+                    return i
                 assert self.typeof(lhs) in (
                     "int", "string"), f"{self.typeof(lhs)} is not int or string, {expression.edges}"
                 assert self.typeof(rhs) in (
                     "int", "string"), f"{self.typeof(rhs)} is not int or string"
                 if self.typeof(lhs) == "int":
-                    return int_c(value=l_val + r_val)  # type: ignore
+                    i = int_c()
+                    i["__value__"] = l_val + r_val  # type: ignore
+                    return i
                 # type: ignore
-                return string_c(value=l_val + r_val)  # type: ignore
+                s = string_c()
+                s["__value__"] = l_val + r_val  # type: ignore
+                return s
             case ComparisonExpression(left=left, sign=sign, right=right):
                 lhs, rhs = self.lr_evaluate(left, right, scope)
-                l_val, r_val = lhs["value"], rhs["value"]  # type: ignore
+                l_val, r_val = lhs[v_prop], rhs[v_prop]  # type: ignore
                 assert self.typeof(
                     lhs) == "int", f"{self.typeof(lhs)} is not int"
                 assert self.typeof(
@@ -177,11 +203,13 @@ class Interpreter:
                 }
 
                 fun = getattr(l_val, comparison_map[sign])  # type: ignore
-                return bool_c(value=fun(r_val))  # type: ignore
+                b = bool_c()
+                b["__value__"] = fun(r_val)  # type: ignore
+                return b
 
             case EqualityExpression(left=left, sign=sign, right=right):
                 lhs, rhs = self.lr_evaluate(left, right, scope)
-                l_val, r_val = lhs["value"], rhs["value"]  # type: ignore
+                l_val, r_val = lhs[v_prop], rhs[v_prop]  # type: ignore
                 assert self.typeof(
                     lhs) == self.typeof(rhs), f"{self.typeof(lhs)} != {self.typeof(rhs)}"
                 comparison_map = {
@@ -189,20 +217,26 @@ class Interpreter:
                     "!=": "__ne__"
                 }
                 fun = getattr(l_val, comparison_map[sign])  # type: ignore
-                return bool_c(value=fun(r_val))  # type: ignore
+                b = bool_c()
+                b["__value__"] = fun(r_val)  # type: ignore
+                return b
 
             case NegationExpression():
                 evaluated = self.evaluate(expression.value, scope)
                 assert self.typeof(
                     evaluated) == "int", f"{self.typeof(evaluated)} is not int"
-                return int_c(value=-evaluated["value"])  # type: ignore
+                i = int_c()
+                i["__value__"] = -evaluated[v_prop]  # type: ignore
+                return i
 
             case PropertyAccessExpression(object=obj, property=property):
                 value = self.evaluate(obj, scope)
                 if isinstance(value, list):
                     # TODO: don't use interpreter magic in future
                     if property == "length":
-                        return int_c(value=len(value))
+                        i = int_c()
+                        i["__value__"] = len(value)  # type: ignore
+                        return i
                     if property == "push":
                         def ipush(to_push):
                             value.append(to_push)
@@ -211,13 +245,13 @@ class Interpreter:
                         def iset(index, to_set):
                             assert self.typeof(
                                 index) == "int", f"{self.typeof(index)} is not int"
-                            value[index["value"]] = to_set
+                            value[index[v_prop]] = to_set
                         return iset  # type: ignore
                     if property == "get":
                         def iget(index):
                             assert self.typeof(
                                 index) == "int", f"{self.typeof(index)} is not int"
-                            return value[index["value"]]
+                            return value[index[v_prop]]
                         return iget  # type: ignore
 
                 assert isinstance(value, dict), f"{value} is not a struct"
@@ -241,11 +275,11 @@ class Interpreter:
                 return val
             case IfExpression(condition=condition, body=then_block, else_ifs=else_ifs, else_body=else_block):
                 condition_val = self.evaluate(condition, scope)
-                if condition_val["value"]:  # type: ignore
+                if condition_val[v_prop]:  # type: ignore
                     return self.evaluate(then_block, scope)
                 for else_if in else_ifs:
                     condition_val = self.evaluate(else_if[0], scope)
-                    if condition_val["value"]:  # type: ignore
+                    if condition_val[v_prop]:  # type: ignore
                         return self.evaluate(else_if[1], scope)
                 if else_block:
                     return self.evaluate(else_block, scope)
@@ -335,7 +369,7 @@ class Interpreter:
                     except ContinueException:
                         continue
             case WhileStatement(condition, body):
-                while self.evaluate(condition, scope)["value"]:  # type: ignore
+                while self.evaluate(condition, scope)[v_prop]:  # type: ignore
                     try:
                         self.evaluate(body, scope)
                     except BreakException:
