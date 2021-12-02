@@ -1,8 +1,8 @@
 import dataclasses
 from collections.abc import Iterable
 from dataclasses import dataclass
-import os
 from typing import Any, Callable
+from smol.interpreter.overwrites import OVERWRITE_TABLE
 from smol.interpreter.utils import RETURN_TYPE, BreakException, ContinueException
 
 from smol.parser.expressions import *
@@ -27,44 +27,9 @@ class InterpreterContext(StageContext):
 
 
 def overwrite_module(interpreter: "Interpreter", name: str) -> None:
-    # FIXME: it's a mess, but it works for now
-    # We need a way to directly use native code with auto-conversion
-
-    if name == "std.file":
-
-        file_struct = interpreter.scope.rec_get("File")
-        string_type = interpreter.scope.rec_get("string")
-
-        def iopen(path: RETURN_TYPE):
-            file = file_struct(path=path)
-
-            def iread():
-                s = string_type()
-                s["__value__"] = file["__file__"].read()
-                return s
-            file["__file__"] = open(path["__value__"], "r")  # type: ignore
-            file["read"] = iread
-            file["seek"] = lambda i: file["__file__"].seek(
-                i["__value__"])  # type: ignore
-            file["close"] = lambda: file["__file__"].close()  # type: ignore
-            return file
-        interpreter.scope.rec_set("open_file", iopen)
-    if name == "std.os":
-        def ishell(value: RETURN_TYPE):
-            os.system(value["__value__"])  # type: ignore
-        interpreter.scope.rec_set("shell", ishell)
-    if name == "std.std":
-        string_type = interpreter.scope.rec_get("string")
-
-        def istr(value: RETURN_TYPE):
-            s = string_type()
-            s["__value__"] = value["__value__"]  # type: ignore
-            return s
-
-        def iprint(value: RETURN_TYPE):
-            print(value["__value__"])  # type: ignore
-        interpreter.scope.rec_set("str", istr)
-        interpreter.scope.rec_set("print", iprint)
+    # FIXME: We need a way to directly use native code with auto-conversion
+    if name in OVERWRITE_TABLE:
+        OVERWRITE_TABLE[name](interpreter)
 
 
 class Interpreter:
@@ -95,7 +60,7 @@ class Interpreter:
         interpreter = Interpreter(module.program(), new_context)
         # Run module
         interpreter.run()
-        overwrite_module(interpreter, name)  # Overwrite std.std and std.file.
+        overwrite_module(interpreter, name)
         # Return module scope
         self.context.module_cache[name] = interpreter.scope
         return interpreter.scope
