@@ -687,16 +687,16 @@ class Checker:
         if name in self.context.module_cache:
             return self.context.module_cache[name]
         module_path = resolve_module_path(self.context.current_directory, name)
-        # Lex module
-        tokens = Lexer.from_file(module_path)
-        # Parse module
-        module = Parser.from_lexer(tokens)
         # Copy context
         new_context = self.context.copy()
         new_context.current_file = module_path.name
         new_context.import_stack.append(name)
+        # Lex module
+        tokens = Lexer.from_file(module_path, new_context)
+        # Parse module
+        module = Parser.from_lexer(tokens)
         # Create new checker
-        program = module.program()
+        program = module.parse()
         checker = Checker(program, new_context)
         # Run module
         checker.check()

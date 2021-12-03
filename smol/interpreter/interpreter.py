@@ -48,14 +48,14 @@ class Interpreter:
         if name in self.context.module_cache:
             return self.context.module_cache[name]
         module_path = resolve_module_path(self.context.current_directory, name)
-        # Lex module
-        tokens = Lexer.from_file(module_path)
-        # Parse module
-        module = Parser.from_lexer(tokens)
         # Copy context
         new_context = self.context.copy()
         new_context.current_file = module_path.name
         new_context.import_stack.append(name)
+        # Lex module
+        tokens = Lexer.from_file(module_path, new_context)
+        # Parse module
+        module = Parser.from_lexer(tokens)
         # Create new interpreter
         interpreter = Interpreter(module.program(), new_context)
         # Run module
@@ -235,7 +235,7 @@ class Interpreter:
                 return object_val(*pos, **kwd)
             case IdentifierExpression(name=name):
                 assert scope.rec_contains(
-                    name), f"Undefined identifier: {name}"
+                    name), f"Undefined identifier: {name} at {expression.edges}"
                 val = scope.rec_get(name)
                 return val
             case IfExpression(condition=condition, body=then_block, else_ifs=else_ifs, else_body=else_block):
@@ -275,10 +275,12 @@ class Interpreter:
             f"Unsupported expression: {expression}")
 
     def execute_function_definition_statement(self, statement: FunctionDefinitionStatement, scope: Scope):
-        def fn(*args):
+        def fn(*args, **kwargs):
             inner_scope = scope.spawn_child()
             for arg, val in zip(statement.args, args):
                 inner_scope.rec_set(arg.name, val)
+            for arg, val in kwargs.items():
+                inner_scope.rec_set(arg, val)
             return self.evaluate(statement.body, inner_scope)
         scope.rec_set(statement.name, fn)
 
@@ -334,6 +336,7 @@ class Interpreter:
                     except ContinueException:
                         continue
             case WhileStatement(condition, body):
+                v_prop = "__value__"
                 while self.evaluate(condition, scope)[v_prop]:  # type: ignore
                     try:
                         self.evaluate(body, scope)
