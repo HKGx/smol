@@ -200,7 +200,7 @@ class Lexer:
                 self._tokens.append(self.string_literal())
             elif self.current_character in TokenType.first_characters():
                 match (self.current_character, self.peek):
-                    case (">" | "<" | "!" | "=" | ":", "=") | (".", "."):
+                    case (">" | "<" | "!" | "=", "=") | (".", "."):
                         assert self.peek is not None
                         self._tokens.append(
                             Token(

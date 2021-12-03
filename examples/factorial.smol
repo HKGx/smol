@@ -1,9 +1,9 @@
 
 
 fn factorial(n: int) int do
-    mut let out := 1
+    mut out := 1
     for v in 1..n+1 do
-        let out := out * v
+        out := out * v
     end
     out
 end

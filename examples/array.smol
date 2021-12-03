@@ -1,7 +1,7 @@
 for a in [1, 2, 3, 4]: print(str(a))
 
 print("---")
-mut let arr: int[] := [1, 2, 3, 4]
+mut arr: int[] = [1, 2, 3, 4]
 print(str(arr.get(2)))
 print("---")
 arr.set(2, 5)

@@ -5,7 +5,7 @@ from functools import cache
 
 class TokenType(Enum):
     # Two or more character tokens and operators
-    DEFINE = ":="
+    DEFINE = "="
     EQUALS = "=="
     NOT_EQUALS = "!="
     SMALLER_OR_EQUAL_THAN = "<="

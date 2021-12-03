@@ -4,8 +4,8 @@ struct Foo
 end
 
 
-let a: Foo := Foo(bar := 1, baz := "test1")
-let b := Foo(baz := "test2", bar := 2)
-let c := [a, b]
+a: Foo = Foo(bar = 1, baz = "test1")
+b := Foo(baz = "test2", bar = 2)
+c := [a, b]
 print(a.baz)
 print(b.baz)

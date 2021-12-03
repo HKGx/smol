@@ -409,23 +409,25 @@ class Parser:
         if self.current_token.typ == TokenType.KEYWORD and self.current_token.image == "mut":
             is_mutable = True
             self.next()
-        assert self.current_token.typ == TokenType.KEYWORD, "Expected `let`"
-        assert self.current_token.image == "let", "Expected `let`"
-        self.next()
-        assert not self.ended, "Expected identifier after `let` but found `EOF`"
-        assert self.current_token.typ == TokenType.IDENTIFIER_LITERAL, "Expected identifier after `let` but found `{self.current_token.image}`"
+        assert not self.ended, "Expected identifier but found `EOF`"
+        assert self.current_token.typ == TokenType.IDENTIFIER_LITERAL, f"Expected identifier but found `{self.current_token.image}`"
         identifier = IdentifierExpression(self.current_token.image)
         self.next()
         typ = TypeDeduceExpression()
-        if self.current_token.typ == TokenType.COLON:
-            self.next()
-            assert not self.ended, "Expected type after `:` but found `EOF`"
-            typ = self.type_expression()
-
-        assert not self.ended, "Expected `:=` but found `EOF`"
-        assert self.current_token.typ == TokenType.DEFINE, f"Expected `:=` but found {self.current_token.image}"
+        assert not self.ended, "Expected `:` but found `EOF`"
+        assert self.current_token.typ == TokenType.COLON, f"Expected `:` but found `{self.current_token.image}`"
         self.next()
-        assert not self.ended, "Expected expression after `:=` but found `EOF`"
+        assert not self.ended, "Expected type expression or `=` after `:` but found `EOF`"
+        if self.current_token.typ == TokenType.DEFINE:
+            self.next()
+            assert not self.ended, "Expected expression after `=` but found `EOF`"
+            value = self.expression()
+            return AssignmentStatement(identifier, value, typ, is_mutable)
+        typ = self.type_expression()
+        assert not self.ended, "Expected `=` but found `EOF`"
+        assert self.current_token.typ == TokenType.DEFINE, f"Expected `=` but found `{self.current_token.image}`"
+        self.next()
+        assert not self.ended, "Expected expression after `=` but found `EOF`"
         value = self.expression()
         return AssignmentStatement(identifier, value, typ, is_mutable)
 
@@ -559,8 +561,11 @@ class Parser:
                 return self.struct_definition_statement()
             case Token(TokenType.KEYWORD, "fn"):
                 return self.function_definition_statement()
-            case Token(TokenType.KEYWORD, "let" | "mut"):
+            case Token(TokenType.KEYWORD,  "mut"):
                 return self.assignment_statement()
+            case Token(TokenType.IDENTIFIER_LITERAL):
+                if self.peek_next and self.peek_next.match(TokenType.COLON, TokenType.DEFINE):
+                    return self.assignment_statement()
             case Token(TokenType.KEYWORD, "for"):
                 return self.for_statement()
             case Token(TokenType.KEYWORD, "while"):
@@ -577,7 +582,7 @@ class Parser:
 
     def parse(self) -> Program:
         try:
-        return self.program()
+            return self.program()
         except AssertionError as e:
             if self.context.current_file:
                 file = self.context.current_directory / self.context.current_file

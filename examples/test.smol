@@ -7,15 +7,15 @@ fn actual_output(s: string) string : "./tests/" + s + ".smol.out"
 fn desired_output(s: string) string : "./tests/" + s + ".out"
 
 for t in ["equality", "stringify", "preparsing"] do
-    let test_path := test(t)
-    let actual_output_path := actual_output(t)
-    let desired_output_path := desired_output(t)
+    test_path := test(t)
+    actual_output_path := actual_output(t)
+    desired_output_path := desired_output(t)
     os.shell("python3 main.py i " + test_path + " > " + actual_output_path)
 
-    let actual_output_file := file.open_file(actual_output_path)
-    let desired_output_file := file.open_file(desired_output_path)
-    let actual_content := actual_output_file.read()
-    let desired_content := desired_output_file.read()
+    actual_output_file := file.open_file(actual_output_path)
+    desired_output_file := file.open_file(desired_output_path)
+    actual_content := actual_output_file.read()
+    desired_content := desired_output_file.read()
     if actual_content != desired_content do 
         print("FAILED: " + t)
         print("Expected: ")

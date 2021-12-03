@@ -1,5 +1,5 @@
 do
-    let foo: int := 2
+    foo: int = 2
     print(str(foo))
 end
-print(str(foo))
+print(str(foo)) # error

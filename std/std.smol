@@ -19,9 +19,9 @@ end
 struct string 
 
     fn repeat(times: int) string do
-        mut let s: string := self
+        mut s: string = self
         for _ in 0..times do 
-            let s := s + self
+            s := s + self
         end
         s
     end
@@ -36,3 +36,4 @@ end
 fn str(s: int or string or bool or none) string do
     ""
 end
+

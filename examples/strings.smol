@@ -1,18 +1,18 @@
 # Test normal strings
-let a := "a123"
+a := "a123"
 # Test newline
-let b := "a\n123" 
+b := "a\n123" 
 # Test tab
-let c := "a\t123"
+c := "a\t123"
 # Test backslash
-let d := "a\\123" 
+d := "a\\123" 
 # Test escaped "
-let e := "a\"123"
+e := "a\"123"
 # Test hex escape
-let f := "a\x23" # "a#"
+f := "a\x23" # "a#"
 # Test hex emoji escape
-let g := "a\x1F603" # "a😃"
+g := "a\x1F603" # "a😃"
 # Test \x escape
-let h := "a\x" # "ax"
+h := "a\x" # "ax"
 
 for i in [a, b, c, d, e, f, g, h] do print("------------------") print(i) end

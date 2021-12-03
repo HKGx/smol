@@ -1,6 +1,6 @@
-mut let x = 10
+mut x := 10
 
 while x != 0 do
     print(str(x))
-    let x: int = x - 1
+    x: int = x - 1
 end

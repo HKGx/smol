@@ -14,5 +14,5 @@ end
 
 fn open_file(path: string) File do
     # stub: interpreter will open the file
-    File(path := path)
+    File(path = path)
 end

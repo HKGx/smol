@@ -1,11 +1,11 @@
-let bools := [true, false, true, false]
+bools := [true, false, true, false]
 
 for b in bools: print(str(b))
 
-let ints := [1, 2, 3, 4]
+ints := [1, 2, 3, 4]
 
 for i in ints: print(str(i))
 
-let strings := ["one", "two", "three", "four"]
+strings := ["one", "two", "three", "four"]
 
 for s in strings: print(str(s))

@@ -1,5 +1,6 @@
-let a: int or string := "xD"
+a: int or string = 1
 
 fn foo(a: int) int or string: a
 
-foo(a)
+foo(a) # error
+

@@ -1,6 +1,6 @@
 fn double(n: int) int: 2 * n
 
-fn test(n: int := 5, d: int := 5) none: print(str(n))
+fn test(n: int = 5, d: int = 5) none: print(str(n))
 
 double(3)
-test()
+test(n=5, d=5)
