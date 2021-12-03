@@ -3,6 +3,7 @@ from io import TextIOWrapper
 from pathlib import Path
 from typing import Union
 from smol.lexer.token import Token, TokenType
+from smol.utils import StageContext
 
 KEYWORDS = {"if", "else", "mut", "let", "do", "end",
             "while", "for", "in", "break", "continue", "fn", "struct", "import", "or", "and", "not"}
@@ -14,6 +15,7 @@ class Lexer:
     current_line: int = 1
     current_column: int = 1
     source: str
+    context: StageContext
 
     @property
     def ended(self) -> bool:
@@ -46,8 +48,9 @@ class Lexer:
         self.current_source_idx -= 1
         self.current_column -= 1
 
-    def __init__(self, source: str):
+    def __init__(self, source: str, context: StageContext):
         self.source = source
+        self.context = context
 
     def skip_whitespace(self):
         """
@@ -229,12 +232,12 @@ class Lexer:
         return self._tokens
 
     @classmethod
-    def from_file(cls, filename: Union[TextIOWrapper, str, Path]) -> "Lexer":
+    def from_file(cls, filename: Union[TextIOWrapper, str, Path], context: StageContext) -> "Lexer":
         """
         Returns a Lexer instance from a file
         """
         if isinstance(filename, (str, Path)):
             with open(filename, "r") as f:
-                return cls(f.read())
+                return cls(f.read(), context)
         else:
-            return cls(filename.read())
+            return cls(filename.read(), context)

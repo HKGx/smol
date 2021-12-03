@@ -5,6 +5,7 @@ from smol.parser.expressions import *
 from smol.parser.statements import *
 
 from smol.lexer import Token, Lexer, TokenType
+from smol.utils import StageContext
 
 
 @dataclass
@@ -25,8 +26,9 @@ class Parser:
     functions: list[FunctionDefinitionStatement]
     imports: list[ImportStatement]
     current: int = 0
+    context: StageContext
 
-    def __init__(self, tokens: list[Token]):
+    def __init__(self, tokens: list[Token], context: StageContext):
         self.tokens = tokens
         self.structs = []
         self.functions = []
@@ -34,6 +36,7 @@ class Parser:
             ImportStatement("std.std", add_to_scope=True)
         ]
         self.current = 0
+        self.context = context
 
     @classmethod
     def from_lexer(cls, lexer: Lexer) -> "Parser":
@@ -43,13 +46,13 @@ class Parser:
         If lexer hasn't ended it'll run .tokenize() on it.
         """
         if lexer.ended:
-            return cls(lexer._tokens)
+            return cls(lexer._tokens, lexer.context)
         else:
-            return cls(lexer.lex())
+            return cls(lexer.lex(), lexer.context)
 
     @classmethod
-    def from_file(cls, filename: str) -> "Parser":
-        return cls.from_lexer(Lexer.from_file(filename))
+    def from_file(cls, filename: str, context: StageContext) -> "Parser":
+        return cls.from_lexer(Lexer.from_file(filename, context))
 
     @property
     def current_token(self) -> Token:
@@ -573,4 +576,12 @@ class Parser:
         return Program(tuple(statements), tuple(self.structs), tuple(self.functions), tuple(self.imports))
 
     def parse(self) -> Program:
+        try:
         return self.program()
+        except AssertionError as e:
+            if self.context.current_file:
+                file = self.context.current_directory / self.context.current_file
+                print(
+                    f"{file}:{self.current_token.line}:{self.current_token.column}")
+
+            raise e
