@@ -8,6 +8,7 @@ from smol.checker import Checker, CheckerContext
 from smol.interpreter import Interpreter, InterpreterContext
 from smol.parser import Parser
 from smol.lexer import Lexer
+from smol.utils import StageContext
 
 
 @dataclass(frozen=True)
@@ -25,18 +26,16 @@ def compile_file(ctx: SmolContext):
 def check_file(ctx: SmolContext):
     assert ctx.file is not None, "File is not specified"
     assert ctx.path is not None, "Path is not specified"
-    tokens = Lexer.from_file(ctx.file).lex()
-    if ctx.debug:
-        pprint(tokens)
-    prog = Parser(tokens).parse()
-    if ctx.debug:
-        pprint(prog)
     kw_context = {
         'current_directory': ctx.path.parent,
         'current_file': ctx.path.name,
     }
+    context = StageContext(**kw_context)
+    lexer = Lexer.from_file(ctx.file, context)
+    parser = Parser.from_lexer(lexer)
+    parsed = parser.parse()
     context = CheckerContext(**kw_context)
-    checker = Checker(prog, context)
+    checker = Checker(parsed, context)
     for error in checker.check():
         print(error)
     if not checker.has_errors:
@@ -46,27 +45,25 @@ def check_file(ctx: SmolContext):
 def interpret_file(ctx: SmolContext):
     assert ctx.file is not None, "File is not specified"
     assert ctx.path is not None, "Path is not specified"
-    tokens = Lexer.from_file(ctx.file).lex()
-    if ctx.debug:
-        pprint(tokens)
-    prog = Parser(tokens).program()
-    if ctx.debug:
-        pprint(prog)
     kw_context = {
         'current_directory': ctx.path.parent,
         'current_file': ctx.path.name,
     }
+    context = StageContext(**kw_context)
+    lexer = Lexer.from_file(ctx.file, context)
+    parser = Parser.from_lexer(lexer)
+    program = parser.parse()
     icontext = InterpreterContext(**kw_context)
     ccontext = CheckerContext(**kw_context)
     if ctx.no_checker:
-        interpreter = Interpreter(prog, icontext)
+        interpreter = Interpreter(program, icontext)
         pprint(interpreter.run())
         return
-    checker = Checker(prog, ccontext)
+    checker = Checker(program, ccontext)
     for error in checker.check():
         print(error)
     if not checker.has_errors:
-        interpreter = Interpreter(prog, icontext)
+        interpreter = Interpreter(program, icontext)
         pprint(interpreter.run())
 
 
@@ -79,20 +76,18 @@ def repl(ctx: SmolContext):
             content.append(line)
             continue
         joined = '\n'.join(content)
-        tokens = Lexer(joined).lex()
-        if ctx.debug:
-            pprint(tokens)
-        prog = Parser(tokens).program()
-        if ctx.debug:
-            pprint(prog)
+        context = StageContext(current_directory=Path.cwd())
+        lexer = Lexer(joined, context)
+        parser = Parser.from_lexer(lexer)
+        parsed = parser.parse()
         icontext = InterpreterContext(current_directory=Path.cwd())
         ccontext = CheckerContext(current_directory=Path.cwd())
-        checker = Checker(prog, ccontext)
+        checker = Checker(parsed, ccontext)
         for error in checker.check():
             print(error)
         if not checker.has_errors:
             print("No errors found during typecheking")
-            interpreter = Interpreter(prog, icontext)
+            interpreter = Interpreter(parsed, icontext)
             pprint(interpreter.run())
         content = []
 
