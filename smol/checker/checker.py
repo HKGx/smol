@@ -172,14 +172,14 @@ class Checker:
                 return TypedExpression(scope.rec_get(name), expression)
             case EqualityExpression(left=left, sign=sign, right=right):
                 l_typ, r_typ = self.lr_evaluate(left, right, scope)
-                if l_typ.type != r_typ.type:
+                if not self.type_equal(l_typ.type, r_typ.type):
                     self.error(
                         f"{expression} has different types: {l_typ.type} and {r_typ.type}", expression)
                     return TypedExpression(INVALID_TYPE, expression)
                 return TypedExpression(bool_type, expression)
             case ComparisonExpression(left=left, sign=sign, right=right):
                 l_typ, r_typ = self.lr_evaluate(left, right, scope)
-                if l_typ.type != r_typ.type:
+                if not self.type_equal(l_typ.type, r_typ.type):
                     self.error(
                         f"{expression} has different types: {l_typ.type} and {r_typ.type}", expression)
                     return TypedExpression(INVALID_TYPE, expression)
@@ -708,12 +708,13 @@ class Checker:
             scope.rec_set(statement.name, struct_type)
             return TypedStatement(struct_type, statement)
         # Check method bodies
+        # FIXME, TODO: if method returns self type, the type should be updated to the struct type
         for defined_method, method in zip(defined_methods, statement.methods):
             inner_scope = scope.spawn_child()
             inner_scope.rec_set(statement.name, struct_type)
             inner_scope.rec_set("self", struct_type)
             for arg in defined_method.type.arg_types:
-                if arg.type.name == statement.name:
+                if self.type_equal(struct_type, arg):
                     inner_scope.rec_set(arg.name, struct_type)
                 else:
                     inner_scope.rec_set(arg.name, arg.type)
