@@ -19,9 +19,9 @@ class ComparisonExpression(Expression):
 
 @dataclass
 class RangeExpression(Expression):
-    left: Expression
-    right: Expression
-    step: Expression
+    start: Expression
+    end: Expression
+    step: Expression | None = None
 
 
 @dataclass
@@ -48,6 +48,12 @@ class ExponentiationExpression(Expression):
 @dataclass
 class NegationExpression(Expression):
     value: Expression
+
+
+@dataclass
+class ArrayAccessExpression(Expression):
+    array: Expression
+    index: Expression
 
 
 @dataclass

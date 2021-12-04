@@ -163,7 +163,7 @@ class Parser:
             assert not self.ended, "Expected expression after '..'"
             rhs = self.addition()
             edges = self.edges(start)
-            step = IntegerExpression(1)
+            step = None
             if (not self.ended and self.current_token.match(TokenType.RANGE)):
                 assert self.current_token.image == ".."
                 self.next()
@@ -205,8 +205,22 @@ class Parser:
     def negation(self) -> Expression:
         if self.current_token.typ == TokenType.MINUS:
             self.next()
-            return NegationExpression(self.function_call())
-        return self.function_call()
+            return NegationExpression(self.array_access())
+        return self.array_access()
+
+    def array_access(self) -> Expression:
+        start = self.current_token
+        expr = self.function_call()
+        if not self.ended and self.current_token.match(TokenType.LEFT_BRACKET):
+            self.next()
+            assert not self.ended, "Expected expression after '['"
+            index = self.expression()
+            assert not self.ended, "Expected ']'"
+            assert self.current_token.match(
+                TokenType.RIGHT_BRACKET), "Expected ']'"
+            self.next()
+            return ArrayAccessExpression(expr, index, edges=self.edges(start))
+        return expr
 
     def function_call(self) -> Expression:
         start = self.current_token
