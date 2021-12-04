@@ -51,7 +51,7 @@ class Checker:
                 message = f"{file}:{expr.source_position()}: {message}"
         # TODO: Don't print stack trace when not in debug mode
         message += "\n"
-        extracted = traceback.extract_stack(limit=6)
+        extracted = traceback.extract_stack()
         message += "\n".join(
             f".\t{f.filename}:{f.lineno} {f.name}" for f in extracted)
         self._errors.append(message)
