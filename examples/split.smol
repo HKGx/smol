@@ -1,0 +1,12 @@
+a := "123.312.589.321.909.910"
+
+c := "2137".repeat(2)
+ 
+print(c)
+
+for b in a.split("."):
+    print(b)
+
+
+# string.split(".") 
+# FIXME: `string` is the constructor, not the string itself, should be patched in checker
