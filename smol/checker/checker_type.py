@@ -4,42 +4,42 @@ from typing import Optional
 from smol.parser.utils import Expression, Statement
 
 
-@dataclass(eq=True, frozen=True)
+@dataclass(eq=True)
 class CheckerType:
     name: str
     meta: dict[str, bool] = field(
         init=False, default_factory=dict, compare=False)
 
 
-@dataclass(eq=True, frozen=True)
+@dataclass(eq=True)
 class InvalidType(CheckerType):
     name = "invalid"
 
 
-@dataclass(eq=True, frozen=True)
+@dataclass(eq=True)
 class ListType(CheckerType):
     inner_type: CheckerType
     known_length: Optional[int]
 
 
-@dataclass(eq=True, frozen=True)
+@dataclass(eq=True)
 class UnionType(CheckerType):
     types: tuple[CheckerType, ...]
 
 
-@dataclass(eq=True, frozen=True)
+@dataclass(eq=True)
 class RangeType(CheckerType):
     has_step: bool
 
 
-@dataclass(eq=True, frozen=True)
+@dataclass(eq=True)
 class FunctionArgumentType(CheckerType):
     name: str
     type: CheckerType
     named: bool = False
 
 
-@dataclass(eq=True, frozen=True)
+@dataclass(eq=True)
 class FunctionType(CheckerType):
     arg_types: tuple[FunctionArgumentType, ...]
     to_type: CheckerType
@@ -56,17 +56,17 @@ class FunctionType(CheckerType):
         return any(arg_type.name == name for arg_type in self.named_arg_types)
 
 
-@dataclass(eq=True, frozen=True)
+@dataclass(eq=True)
 class StructFieldType(CheckerType):
     type: CheckerType
 
 
-@dataclass(eq=True, frozen=True)
+@dataclass(eq=True)
 class StructMethodType(CheckerType):
     type: FunctionType
 
 
-@dataclass(eq=True, frozen=True)
+@dataclass(eq=True)
 class StructType(CheckerType):
     fields: tuple[StructFieldType, ...]
     methods: tuple[StructMethodType, ...]
@@ -78,13 +78,13 @@ class StructType(CheckerType):
         return None
 
 
-@dataclass(eq=True, frozen=True)
+@dataclass(eq=True)
 class ModuleType(CheckerType):
     name: str
     types: dict[str, CheckerType]
 
 
-@dataclass(eq=True, frozen=True)
+@dataclass(eq=True)
 class TypedExpression:
     type: CheckerType
     value: Expression
