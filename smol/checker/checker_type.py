@@ -28,6 +28,11 @@ class UnionType(CheckerType):
 
 
 @dataclass(eq=True, frozen=True)
+class RangeType(CheckerType):
+    has_step: bool
+
+
+@dataclass(eq=True, frozen=True)
 class FunctionArgumentType(CheckerType):
     name: str
     type: CheckerType
