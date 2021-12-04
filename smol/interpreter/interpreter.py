@@ -73,11 +73,14 @@ class Interpreter:
             scope = self.scope
         lhs_val = self.evaluate(lhs, scope)
         rhs_val = self.evaluate(rhs, scope)
+        assert isinstance(
+            lhs_val, dict), f"Left hand side of assignment must be a dict, got {lhs_val}"
+        assert isinstance(
+            rhs_val, dict), f"Right hand side of assignment must be a dict, got {rhs_val}"
         return lhs_val, rhs_val
 
     def typeof(self, value: RETURN_TYPE) -> str:
         if isinstance(value, list):
-            print(value)
             if len(value) == 0:
                 return "list.none"
             return "list." + self.typeof(value[0])
@@ -99,7 +102,9 @@ class Interpreter:
                 i["__value__"] = expression.value  # type: ignore
                 return i
             case StringExpression():
-                s = string_c()
+                i_len = int_c()
+                i_len["__value__"] = len(expression.value)  # type: ignore
+                s = string_c(length=i_len)
                 s["__value__"] = expression.value  # type: ignore
                 return s
             case BooleanExpression():
@@ -126,7 +131,7 @@ class Interpreter:
                 i = int_c()
                 if sign == "*":
                     i["__value__"] = l_val * r_val  # type: ignore
-                elif sign == "/":
+                else:
                     i["__value__"] = l_val // r_val  # type: ignore
                 return i
 
@@ -150,7 +155,9 @@ class Interpreter:
                     i["__value__"] = l_val + r_val  # type: ignore
                     return i
                 # type: ignore
-                s = string_c()
+                i_len = int_c()
+                i_len["__value__"] = len(l_val) + len(r_val)
+                s = string_c(length=i_len)
                 s["__value__"] = l_val + r_val  # type: ignore
                 return s
             case ComparisonExpression(left=left, sign=sign, right=right):
@@ -212,15 +219,45 @@ class Interpreter:
                                 index) == "int", f"{self.typeof(index)} is not int"
                             value[index[v_prop]] = to_set
                         return iset  # type: ignore
-                    if property == "get":
-                        def iget(index):
-                            assert self.typeof(
-                                index) == "int", f"{self.typeof(index)} is not int"
-                            return value[index[v_prop]]
-                        return iget  # type: ignore
 
                 assert isinstance(value, dict), f"{value} is not a struct"
                 return value[property]
+            case ArrayAccessExpression(array=obj, index=index):
+                value = self.evaluate(obj, scope)
+                assert self.typeof(value) == "string" or isinstance(
+                    value, list), f"{value} is not a string or array"
+                if isinstance(index, RangeExpression):
+                    start, end = self.lr_evaluate(
+                        index.start, index.end, scope)
+                    assert self.typeof(
+                        start) == "int", f"{self.typeof(start)} is not int"
+                    assert self.typeof(
+                        end) == "int", f"{self.typeof(end)} is not int"
+                    start_val: int = start[v_prop]  # type: ignore
+                    end_val: int = end[v_prop]  # type: ignore
+                    if isinstance(value, list):
+                        return value[start_val:end_val]
+                    if self.typeof(value) == "string":
+                        str_val: str = value[v_prop]  # type: ignore
+                        slice_ = str_val[start_val:end_val]
+                        i_len = int_c()
+                        i_len["__value__"] = len(slice_)
+                        val = string_c(length=i_len)
+                        val["__value__"] = slice_  # type: ignore
+                        return val  # type: ignore
+                index_value = self.evaluate(index, scope)
+                assert self.typeof(
+                    index_value) == "int", f"{self.typeof(index_value)} is not int"
+                if isinstance(value, list):
+                    return value[index_value[v_prop]]  # type: ignore
+                if self.typeof(value) == "string":
+                    str_val: str = value[v_prop]  # type: ignore
+                    i_len = int_c()
+                    i_len["__value__"] = len(str_val)
+                    val = string_c(length=i_len)
+                    val["__value__"] = str_val[index_value[v_prop]]  # type: ignore
+                    return val  # type: ignore
+
             case FunctionCallExpression(object=object, args=args):
                 object_val = self.evaluate(object, scope)
                 assert isinstance(
@@ -237,17 +274,25 @@ class Interpreter:
                 assert scope.rec_contains(
                     name), f"Undefined identifier: {name} at {expression.edges}"
                 val = scope.rec_get(name)
+                if isinstance(val, (Callable, list)):
+                    return val  # type: ignore
+                if v_prop in val:
+                    assert isinstance(
+                        val[v_prop], (str, bool, int)), f"{val[v_prop]} is not a string, bool or int"
                 return val
-            case IfExpression(condition=condition, body=then_block, else_ifs=else_ifs, else_body=else_block):
+            case IfExpression(condition=condition, body=body, else_ifs=else_ifs, else_body=else_body):
                 condition_val = self.evaluate(condition, scope)
+                assert self.typeof(
+                    condition_val) == "bool", f"{self.typeof(condition_val)} is not bool"
                 if condition_val[v_prop]:  # type: ignore
-                    return self.evaluate(then_block, scope)
+                    return self.evaluate(body, scope)
                 for else_if in else_ifs:
                     condition_val = self.evaluate(else_if[0], scope)
                     if condition_val[v_prop]:  # type: ignore
                         return self.evaluate(else_if[1], scope)
-                if else_block:
-                    return self.evaluate(else_block, scope)
+                if else_body:
+                    return self.evaluate(else_body, scope)
+                return none_c()
             case BlockExpression(body=statements):
                 inner_scope = scope.spawn_child()
                 last: RETURN_TYPE = none_c()
@@ -256,17 +301,23 @@ class Interpreter:
                 return last
             case ArrayExpression(elements=values):
                 return [self.evaluate(value, scope) for value in values]
-            case RangeExpression(left=start, right=end, step=step):
-                start_value = self.evaluate(start, scope)
-                end_value = self.evaluate(end, scope)
-                step_value = self.evaluate(step, scope)
-                assert isinstance(start_value, (int)
-                                  ), f"{start_value} is not a number"
+            case RangeExpression(start=start, end=end, step=step):
+                start_value = self.evaluate(start, scope)[
+                    v_prop]  # type: ignore
+                end_value = self.evaluate(
+                    end, scope)[v_prop]  # type: ignore
+                step_value = self.evaluate(step, scope)[
+                    v_prop] if step else 1  # type: ignore
                 assert isinstance(
-                    end_value, (int)), f"{end_value} is not a number"
-                assert isinstance(
-                    step_value, (int)), f"{step_value} is not a number"
-                return [int_c(value=i) for i in range(start_value, end_value, step_value)]
+                    start_value, int), f"{start_value} is not int"
+                assert isinstance(end_value, int), f"{end_value} is not int"
+                assert isinstance(step_value, int), f"{step_value} is not int"
+                output = []
+                for i in range(start_value, end_value, step_value):
+                    ic = int_c()
+                    ic["__value__"] = i
+                    output.append(ic)
+                return output
             case BreakExpression():
                 raise BreakException()
             case ContinueExpression():
@@ -289,13 +340,17 @@ class Interpreter:
             struct = {}
             struct["__constructor__"] = constructor
             for method in statement.methods:
-                def fn(*args, **kwargs):
-                    inner_scope = scope.spawn_child()
-                    inner_scope["self"] = struct
-                    for arg, val in zip(method.args, args):
-                        inner_scope[arg.name] = val
-                    return self.evaluate(method.body, inner_scope)
-                struct[method.name] = fn
+                def make_fn(m):
+                    def fn(*pos, **kwd):
+                        inner_scope = scope.spawn_child()
+                        inner_scope["self"] = struct
+                        for arg, val in zip(m.args, pos):
+                            inner_scope[arg.name] = val
+                        for arg, val in kwd.items():
+                            inner_scope[arg] = val
+                        return self.evaluate(m.body, inner_scope)
+                    return fn
+                struct[method.name] = make_fn(method)
             for field in statement.fields:
                 struct[field.name] = kwargs[field.name]
             return struct
@@ -316,17 +371,22 @@ class Interpreter:
         scope.rec_set(module_name, module)
 
     def execute(self, statement: Statement, scope: Scope) -> RETURN_TYPE | None:
+        v_prop = "__value__"
         match statement:
             case AssignmentStatement(ident, expression):
                 value = self.evaluate(expression, scope)
+                if v_prop in value:
+                    val = value[v_prop]  # type: ignore
+                    assert isinstance(
+                        val, (str, bool, int)), f"{val} is not a string, bool or int"
                 scope.rec_set(ident.name, value)
                 return value
             case ExpressionStatement(expression):
                 return self.evaluate(expression, scope)
             case ForStatement(ident, value, body):
                 values = self.evaluate(value, scope)  # type: ignore
-                if not isinstance(values, Iterable):
-                    raise TypeError(f"{values} is not iterable")
+                assert isinstance(values, list), f"{values} is not a list"
+
                 for val in values:
                     scope.rec_set(ident.name, val)
                     try:
@@ -336,7 +396,6 @@ class Interpreter:
                     except ContinueException:
                         continue
             case WhileStatement(condition, body):
-                v_prop = "__value__"
                 while self.evaluate(condition, scope)[v_prop]:  # type: ignore
                     try:
                         self.evaluate(body, scope)

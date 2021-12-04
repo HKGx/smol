@@ -16,7 +16,9 @@ end
 struct bool
 end
 
-struct string 
+struct string
+
+    length: int
 
     fn repeat(times: int) string do
         mut s: string = self
@@ -25,8 +27,33 @@ struct string
         end
         s
     end
+
+    fn split(delimiter: string) string[] do
+        mut result: string[] = []
+        mut start_index: int = 0
+        mut end_index: int = 0
+        while end_index < self.length do
+            if self[end_index] == delimiter do
+                result.push(self[start_index..end_index])
+                start_index := end_index + 1
+            end
+            end_index := end_index + 1
+        end
+        result.push(self[start_index..end_index])
+        result
+    end
+
+    fn charcode_at(index: int) int do
+        _charcode_at(self, index)
+    end
+
+
 end
 
+# A stub for the interpreter.
+fn _charcode_at(s: string, index: int) int do
+    0
+end
 
 fn print(s: string) do 
     # TODO: print to stdout, do not rely on the interpreter
@@ -37,3 +64,11 @@ fn str(s: int or string or bool or none) string do
     ""
 end
 
+fn s2i(s: string) int do
+    # Asserts that the string is a valid integer
+    mut i: int = 0
+    for idx in 0..s.length do
+        i := i * 10 + s.charcode_at(idx) - 48
+    end
+    i
+end
