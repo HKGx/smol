@@ -130,11 +130,14 @@ class Checker:
         if typ1 == typ2:
             return True
 
+        none_type = self.scope.rec_get("none")
         if isinstance(typ1, StructType) and isinstance(typ2, StructType):
             return typ1.name == typ2.name  # THIS IS DANGEROUS! FIXME LATER
         if isinstance(typ1, UnionType) and isinstance(typ2, UnionType):
             return all(self.type_equal(t1, t2) for t1, t2 in zip(typ1.types, typ2.types))
         if isinstance(typ1, ListType) and isinstance(typ2, ListType):
+            if self.type_equal(none_type, typ2.inner_type):
+                return True
             if typ1.known_length is None and typ2.known_length is None:
                 return self.type_equal(typ1.inner_type, typ2.inner_type)
             if typ1.known_length is not None and typ2.known_length is not None:
@@ -303,13 +306,6 @@ class Checker:
                             none_type
                         )
                         return TypedExpression(push_type, expression)
-                    if property == "get":
-                        get_type = FunctionType(
-                            "get",
-                            (FunctionArgumentType("index", int_type),),
-                            typ.type.inner_type
-                        )
-                        return TypedExpression(get_type, expression)
                     if property == "set":
                         if not typ.type.meta.get("mut"):
                             self.error(
@@ -333,6 +329,35 @@ class Checker:
                         f"Invalid operation: {typ.type} has no property {property}", expression)
                     return TypedExpression(INVALID_TYPE, expression)
                 return TypedExpression(member_typ.type, expression)
+            case ArrayAccessExpression(array=obj, index=index):
+                typ = self.evaluate_type_expression(obj, scope)
+                index_typ = self.evaluate_type_expression(index, scope)
+                if isinstance(typ.type, ListType):
+                    if not self.type_equal(index_typ.type, int_type):
+                        self.error(
+                            f"Invalid index type: {index_typ.type} is not an integer or range", index)
+                        return TypedExpression(INVALID_TYPE, expression)
+                    if self.type_equal(index_typ.type, int_type):
+                        return TypedExpression(typ.type.inner_type, expression)
+                    if isinstance(index_typ.type, RangeType):
+                        if index_typ.type.has_step:
+                            self.error(
+                                f"Invalid index type: {index_typ.type} has a step", index)
+                            return TypedExpression(INVALID_TYPE, expression)
+                        return TypedExpression(typ.type, expression)
+                if self.type_equal(string_type, typ.type):
+                    if self.type_equal(index_typ.type, int_type):
+                        return TypedExpression(string_type, expression)
+                    if isinstance(index_typ.type, RangeType):
+                        if index_typ.type.has_step:
+                            self.error(
+                                f"Invalid index type: {index_typ.type} has a step", index)
+                            return TypedExpression(INVALID_TYPE, expression)
+                        return TypedExpression(string_type, expression)
+
+                self.error(f"Invalid array access: {typ.type}", expression)
+                return TypedExpression(INVALID_TYPE, expression)
+
             case FunctionCallExpression(object=object):
                 typ = self.evaluate_type_expression(object, scope)
                 function = typ.type
@@ -349,26 +374,36 @@ class Checker:
             case BlockExpression(body=statements):
                 inner_scope = scope.spawn_child()
                 for statement in statements[:-1]:
-                    self.check_statement(statement, inner_scope)
+                    self.check_statement(statement, scope=inner_scope)
                 if len(statements) == 0:
                     return TypedExpression(none_type, expression)
-                stat = self.check_statement(statements[-1], inner_scope)
+                stat = self.check_statement(statements[-1], scope=inner_scope)
                 stat_type = stat.type
                 if stat.type == INVALID_TYPE:
                     return TypedExpression(INVALID_TYPE, expression)
                 if self.type_equal(stat_type, none_type):
                     return TypedExpression(none_type, expression)
                 return TypedExpression(stat_type, expression)
-            case RangeExpression(left=start, right=end, step=step):
+            case RangeExpression(start=start, end=end, step=step):
                 start_type = self.evaluate_type_expression(start, scope)
                 end_type = self.evaluate_type_expression(end, scope)
-                step_type = self.evaluate_type_expression(step, scope)
-                if self.type_equal(start_type.type, int_type) and self.type_equal(end_type.type, int_type) and self.type_equal(step_type.type, int_type):
-                    return TypedExpression(ListType("list", int_type, 0), expression)
-
-                self.error(
-                    f"Invalid range: {start_type.type} to {end_type.type} by {step_type.type}", expression)
-                return TypedExpression(INVALID_TYPE, expression)
+                step_type = self.evaluate_type_expression(
+                    step, scope) if step is not None else None
+                if not self.type_equal(start_type.type, int_type):
+                    self.error(
+                        f"Invalid range: `{start}` is not an integer", expression)
+                    return TypedExpression(INVALID_TYPE, expression)
+                if not self.type_equal(end_type.type, int_type):
+                    self.error(
+                        f"Invalid range: `{end}` is not an integer", expression)
+                    return TypedExpression(INVALID_TYPE, expression)
+                if step_type is not None and not self.type_equal(step_type.type, int_type):
+                    self.error(
+                        f"Invalid range: `{step}` is not an integer", expression)
+                    return TypedExpression(INVALID_TYPE, expression)
+                # TODO: Implement checking whether range is valid using constant evaluation
+                has_step = step is not None
+                return TypedExpression(RangeType("range", has_step=has_step), expression)
 
         raise NotImplementedError(f"{expression}")
 
@@ -442,16 +477,21 @@ class Checker:
             expr_type = self.evaluate_type_expression(expr, scope)
             defined_type = self.evaluate_type(
                 statement.type, scope) or expr_type.type
+            if isinstance(defined_type, ListType):
+                none_type = scope.rec_get("none")
+                if self.type_equal(none_type, expr_type.type):
+                    defined_type = dataclass_replace(
+                        defined_type, inner_type=defined_type)
             if not self.type_equal(defined_type, expr_type.type):
                 self.error(
                     f"Invalid assignment: Defined type {defined_type} is not equal to {expr_type.type}!")
                 return TypedStatement(INVALID_TYPE, statement)
             if statement.mutable:
-                new_typ = dataclass_replace(expr_type.type)  # copy type
+                new_typ = dataclass_replace(defined_type)  # copy type
                 new_typ.meta["mut"] = True
                 scope.rec_set(ident_name, new_typ)
             else:
-                scope.rec_set(ident_name, expr_type.type)
+                scope.rec_set(ident_name, defined_type)
             return TypedStatement(expr_type.type, statement)
         if statement.mutable:
             self.error(
@@ -504,14 +544,19 @@ class Checker:
         iterable_type = self.evaluate_type_expression(
             value, scope).type
 
-        if not isinstance(iterable_type, ListType):
+        if not isinstance(iterable_type, (ListType, RangeType)):
             self.error(
                 f"Type {iterable_type} is not iterable")
             return TypedStatement(INVALID_TYPE, statement)
         inner_scope = scope.spawn_child()
 
         # pylint: disable=no-member
-        inner_scope.rec_set(ident_name, iterable_type.inner_type)
+        if isinstance(iterable_type, ListType):
+            inner_scope.rec_set(ident_name, iterable_type.inner_type)
+        elif isinstance(iterable_type, RangeType):
+            int_type = scope.rec_get("int")
+            inner_scope.rec_set(ident_name, int_type)
+
         self.evaluate_type_expression(body, inner_scope)
         return TypedStatement(none_type, statement)
 
@@ -668,14 +713,17 @@ class Checker:
             inner_scope.rec_set(statement.name, struct_type)
             inner_scope.rec_set("self", struct_type)
             for arg in defined_method.type.arg_types:
-                inner_scope.rec_set(arg.name, arg.type)
+                if arg.type.name == statement.name:
+                    inner_scope.rec_set(arg.name, struct_type)
+                else:
+                    inner_scope.rec_set(arg.name, arg.type)
             typ = self.evaluate_type_expression(method.body, inner_scope)
-            return_typ = self.evaluate_type(method.return_type, scope)
+            return_typ = self.evaluate_type(method.return_type, inner_scope)
             if return_typ is None:
                 return_typ = scope.rec_get("none")
             if not self.type_equal(return_typ, typ.type):
                 self.error(
-                    f"Invalid struct definition: Method {method.name} has invalid return type!")
+                    f"Invalid struct definition: Method {method.name} has invalid return type! Expected {return_typ}, got {typ}")
                 return TypedStatement(INVALID_TYPE, statement)
         scope.rec_set(statement.name, struct_type)
         return TypedStatement(struct_type, statement)
@@ -689,6 +737,7 @@ class Checker:
         module_path = resolve_module_path(self.context.current_directory, name)
         # Copy context
         new_context = self.context.copy()
+        new_context.current_directory = module_path.parent
         new_context.current_file = module_path.name
         new_context.import_stack.append(name)
         # Lex module
