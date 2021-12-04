@@ -1,7 +1,6 @@
 import traceback
 from dataclasses import dataclass, field
 from dataclasses import replace as dataclass_replace
-from typing import NamedTuple
 
 from smol.checker.checker_type import *
 from smol.lexer import Lexer
@@ -108,8 +107,8 @@ class Checker:
                     return INVALID_TYPE
                 return typ
             case TypeUnionExpression(elements=union_types):
-                types: set[CheckerType] = {self.evaluate_type(
-                    t, scope) for t in union_types}  # type: ignore
+                types: list[CheckerType] = [self.evaluate_type(
+                    t, scope) for t in union_types]  # type: ignore
                 if any(t is None for t in types):
                     self.error(f"Invalid union type", t_expression)
                     return INVALID_TYPE
@@ -480,8 +479,7 @@ class Checker:
             if isinstance(defined_type, ListType):
                 none_type = scope.rec_get("none")
                 if self.type_equal(none_type, expr_type.type):
-                    defined_type = dataclass_replace(
-                        defined_type, inner_type=defined_type)
+                    defined_type.inner_type = defined_type
             if not self.type_equal(defined_type, expr_type.type):
                 self.error(
                     f"Invalid assignment: Defined type {defined_type} is not equal to {expr_type.type}!")
@@ -726,6 +724,13 @@ class Checker:
                 self.error(
                     f"Invalid struct definition: Method {method.name} has invalid return type! Expected {return_typ}, got {typ}")
                 return TypedStatement(INVALID_TYPE, statement)
+        for method in struct_type.methods:
+            # TODO: check recursively for struct_type in method returns
+            if self.type_equal(struct_type, method.type.to_type):
+                method.type.to_type = struct_type
+            elif isinstance(method.type.to_type, ListType):
+                if self.type_equal(struct_type, method.type.to_type.inner_type):
+                    method.type.to_type.inner_type = struct_type
         scope.rec_set(statement.name, struct_type)
         return TypedStatement(struct_type, statement)
 
