@@ -57,7 +57,7 @@ def resolve_module_path(file_dir: Path, module_name: str) -> Path:
     # module path is relative to the current working directory
     # module name "foo" is resolved to "foo.smol"
     # module name "foo/bar" is resolved to "foo/bar.smol"
-    if module_name.startswith("std."):
+    if module_name.startswith("std/"):
         # strip "std." prefix
         module_name = module_name[4:]
         # TODO: make std path configurable
