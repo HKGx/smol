@@ -1,13 +1,13 @@
 import dataclasses
 from dataclasses import dataclass
 from typing import Any, Callable
+
 from smol.interpreter.overwrites import OVERWRITE_TABLE
 from smol.interpreter.utils import RETURN_TYPE, BreakException, ContinueException
-
+from smol.lexer.lexer import Lexer
 from smol.parser.expressions import *
 from smol.parser.parser import Parser, Program
 from smol.parser.statements import *
-from smol.lexer.lexer import Lexer
 from smol.utils import Scope, StageContext, resolve_module_path
 
 

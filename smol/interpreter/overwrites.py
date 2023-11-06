@@ -1,5 +1,6 @@
-from .utils import RETURN_TYPE
 import os
+
+from .utils import RETURN_TYPE
 
 
 def overwrite_std_file(interpreter):

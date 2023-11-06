@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field
+
 from smol.parser.expressions import IdentifierExpression, TypeExpression
 from smol.parser.utils import Expression, Statement
 

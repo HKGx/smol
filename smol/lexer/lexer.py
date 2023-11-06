@@ -2,6 +2,7 @@ import string
 from io import TextIOWrapper
 from pathlib import Path
 from typing import Union
+
 from smol.lexer.token import Token, TokenType
 from smol.utils import StageContext
 

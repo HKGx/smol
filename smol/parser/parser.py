@@ -1,11 +1,12 @@
 from dataclasses import dataclass
 from textwrap import dedent
 from typing import Literal
+
+import smol.parser.expressions as E
+import smol.parser.statements as S
 from smol.lexer.lexer import Lexer
 from smol.lexer.token import Token, TokenType
-import smol.parser.expressions as E
 from smol.utils import StageContext
-import smol.parser.statements as S
 
 
 @dataclass

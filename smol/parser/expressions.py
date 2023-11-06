@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from typing import Literal
+
 from smol.parser.utils import Expression, Statement
 
 
