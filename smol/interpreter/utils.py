@@ -1,4 +1,4 @@
-RETURN_TYPE = dict[str, "RETURN_TYPE"] | list["RETURN_TYPE"]
+type RETURN_TYPE = dict[str, RETURN_TYPE] | list[RETURN_TYPE]
 
 
 class BreakException(Exception):
