@@ -1,5 +1,5 @@
-import std.file
-import std.os 
+import std/file
+import std/os 
 
 
 fn test(s: string) string : "./tests/" + s + ".smol"

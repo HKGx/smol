@@ -1,4 +1,4 @@
-import std.file
+import std/file
 
 f := file.open_file("./examples/factorial.smol")
 f_contents := f.read()
