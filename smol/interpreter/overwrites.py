@@ -8,10 +8,10 @@ def overwrite_std_file(interpreter):
     int_type = interpreter.scope.rec_get("int")
     string_type = interpreter.scope.rec_get("string")
 
-    def iopen(path: RETURN_TYPE):
+    def open_overwrite(path: RETURN_TYPE):
         file = file_struct(path=path)
 
-        def iread():
+        def read_overwrite():
             read = file["__file__"].read()
             i_len = int_type()
             i_len["__value__"] = len(read)
@@ -20,19 +20,19 @@ def overwrite_std_file(interpreter):
             return s
 
         file["__file__"] = open(path["__value__"], "r")  # type: ignore
-        file["read"] = iread
+        file["read"] = read_overwrite
         file["seek"] = lambda i: file["__file__"].seek(i["__value__"])  # type: ignore
         file["close"] = lambda: file["__file__"].close()  # type: ignore
         return file
 
-    interpreter.scope.rec_set("open_file", iopen)
+    interpreter.scope.rec_set("open_file", open_overwrite)
 
 
 def overwrite_std_os(interpreter):
-    def ishell(value: RETURN_TYPE):
+    def shell_overwrite(value: RETURN_TYPE):
         os.system(value["__value__"])  # type: ignore
 
-    interpreter.scope.rec_set("shell", ishell)
+    interpreter.scope.rec_set("shell", shell_overwrite)
 
 
 def overwrite_std_std(interpreter):
@@ -40,7 +40,7 @@ def overwrite_std_std(interpreter):
     int_type = interpreter.scope.rec_get("int")
     v_prop = "__value__"
 
-    def istr(value: RETURN_TYPE):
+    def str_overwrite(value: RETURN_TYPE):
         stringified = str(value[v_prop])  # type: ignore
         i_len = int_type()
         i_len[v_prop] = len(stringified)
@@ -48,7 +48,7 @@ def overwrite_std_std(interpreter):
         s[v_prop] = stringified
         return s
 
-    def ichar_at(value: RETURN_TYPE, index: RETURN_TYPE):
+    def char_at_overwrite(value: RETURN_TYPE, index: RETURN_TYPE):
         s_value: str = value[v_prop]  # type: ignore
         i_index: int = index[v_prop]  # type: ignore
         char = s_value[i_index]
@@ -56,12 +56,12 @@ def overwrite_std_std(interpreter):
         i[v_prop] = ord(char)
         return i
 
-    def iprint(value: RETURN_TYPE):
+    def print_overwrite(value: RETURN_TYPE):
         print(value[v_prop])  # type: ignore
 
-    interpreter.scope.rec_set("str", istr)
-    interpreter.scope.rec_set("print", iprint)
-    interpreter.scope.rec_set("_charcode_at", ichar_at)
+    interpreter.scope.rec_set("str", str_overwrite)
+    interpreter.scope.rec_set("print", print_overwrite)
+    interpreter.scope.rec_set("_charcode_at", char_at_overwrite)
 
 
 OVERWRITE_TABLE = {
