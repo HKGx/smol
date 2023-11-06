@@ -5,8 +5,12 @@ from typing import Any, Callable
 from smol.interpreter.overwrites import OVERWRITE_TABLE
 from smol.interpreter.utils import RETURN_TYPE, BreakException, ContinueException
 from smol.lexer.lexer import Lexer
+
+# TODO: fix this import
 from smol.parser.expressions import *
 from smol.parser.parser import Parser, Program
+
+# TODO: fix this import
 from smol.parser.statements import *
 from smol.utils import Scope, StageContext, resolve_module_path
 
