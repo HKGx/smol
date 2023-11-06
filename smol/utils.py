@@ -1,12 +1,10 @@
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Optional, Protocol, TypeVar
-
-ScopeValue = TypeVar("ScopeValue")
+from typing import Protocol, Self
 
 
-class Scope(dict[str, ScopeValue]):
-    parent: Optional["Scope"] = None
+class Scope[ScopeValue](dict[str, ScopeValue]):
+    parent: Self | None = None
 
     @classmethod
     def from_dict(cls, dict_: dict[str, ScopeValue]):
@@ -15,7 +13,7 @@ class Scope(dict[str, ScopeValue]):
             new[key] = value
         return new
 
-    def __init__(self, parent: "Scope" = None):
+    def __init__(self, parent: Self | None = None):
         super().__init__()
         self.parent = parent
 
@@ -48,33 +46,25 @@ class Scope(dict[str, ScopeValue]):
         return Scope(parent=self)
 
 
-to = TypeVar("to")
-
-
 @dataclass()
 class StageContext:
     current_directory: Path
-    current_file: Optional[str] = None
+    current_file: str | None = None
     import_stack: list[str] = field(default_factory=list)
 
 
 def resolve_module_path(file_dir: Path, module_name: str) -> Path:
     # module path is relative to the current working directory
     # module name "foo" is resolved to "foo.smol"
-    # module name "foo.bar" is resolved to "foo/bar.smol"
+    # module name "foo/bar" is resolved to "foo/bar.smol"
     if module_name.startswith("std."):
         # strip "std." prefix
         module_name = module_name[4:]
+        # TODO: make std path configurable
         std_path = Path(__file__).parent.parent / "std"
         return Path(std_path / f"{module_name}.smol")
-    submodules = module_name.split(".")
-    if len(submodules) == 1:
-        return file_dir / (module_name + ".smol")
-    else:
-        dir = file_dir
-        for submodule in submodules[:-1]:
-            dir = dir / submodule
-        return dir / (submodules[-1] + ".smol")
+
+    return Path.resolve(file_dir / f"{module_name}.smol")
 
 
 class SourcePositionable(Protocol):
