@@ -1,21 +1,25 @@
 [tool.poetry]
 name = "smol"
-version = "0.1.0"
-description = "A programming language"
-authors = ["HKG <mail@hkgdoes.dev>"]
+version = "0.0.1"
+description = "A small, expresive programming language"
+authors = ["Your Name <you@example.com>"]
 license = "MIT"
+readme = "README.md"
 
 [tool.poetry.dependencies]
-python = "^3.10"
-pytest = "^6.2.5"
-watchdog = "^2.1.6"
+python = "3.12"
 
-[tool.poetry.dev-dependencies]
-mypy = "^0.910"
-PyYAML = "^6.0"
-autopep8 = "^1.6.0"
-pylint = "^2.11.1"
+[tool.poetry.group.dev.dependencies]
+black = "^23.10.1"
+isort = "^5.12.0"
+pyright = "^1.1.334"
+pre-commit = "^3.5.0"
+pytest = "^7.4.3"
+ruff = "^0.1.4"
 
 [build-system]
-requires = ["poetry-core>=1.0.0"]
+requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.isort]
+profile = "black"
