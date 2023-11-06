@@ -5,8 +5,25 @@ from typing import Union
 from smol.lexer.token import Token, TokenType
 from smol.utils import StageContext
 
-KEYWORDS = {"if", "else", "mut", "let", "do", "end",
-            "while", "for", "in", "break", "continue", "fn", "struct", "import", "or", "and", "not"}
+KEYWORDS = {
+    "if",
+    "else",
+    "mut",
+    "let",
+    "do",
+    "end",
+    "while",
+    "for",
+    "in",
+    "break",
+    "continue",
+    "fn",
+    "struct",
+    "import",
+    "or",
+    "and",
+    "not",
+}
 
 
 class Lexer:
@@ -80,10 +97,10 @@ class Lexer:
         start = self.current_source_idx
         while not self.ended and self.current_character.isdigit():
             self.increment()
-        image = self.source[start: self.current_source_idx]
+        image = self.source[start : self.current_source_idx]
         return Token(
             typ=TokenType.INTEGER_LITERAL,
-            image=self.source[start: self.current_source_idx],
+            image=self.source[start : self.current_source_idx],
             line=self.current_line,
             column=self.current_column - len(image),
         )
@@ -112,7 +129,7 @@ class Lexer:
                         self.increment()
                     else:
                         break
-                content = self.source[start: self.current_source_idx]
+                content = self.source[start : self.current_source_idx]
                 self.decrement()
                 if len(content) == 0:
                     return "x"
@@ -122,10 +139,12 @@ class Lexer:
                 for _ in range(4):
                     self.increment()
                     assert not self.ended, "Unexpected end of source"
-                    assert self.current_character in string.hexdigits, "Invalid hexadecimal digit"
-                return chr(int(self.source[start: self.current_source_idx], 16))
-            case "\"":
-                return "\""
+                    assert (
+                        self.current_character in string.hexdigits
+                    ), "Invalid hexadecimal digit"
+                return chr(int(self.source[start : self.current_source_idx], 16))
+            case '"':
+                return '"'
             case _:
                 return curr
 
@@ -143,7 +162,9 @@ class Lexer:
                 case '"':
                     break
                 case "\n":
-                    assert False, f"Unterminated string literal: {self.current_line}:{self.current_column}"
+                    assert (
+                        False
+                    ), f"Unterminated string literal: {self.current_line}:{self.current_column}"
                 # Handle escape sequences
                 case "\\":
                     content += self.escape_sequence()
@@ -165,11 +186,11 @@ class Lexer:
         Parse identifier literal and return Token
         """
         start = self.current_source_idx
-        while (not self.ended
-               and (self.current_character.isalnum()
-                    or self.current_character == "_")):
+        while not self.ended and (
+            self.current_character.isalnum() or self.current_character == "_"
+        ):
             self.increment()
-        image = self.source[start: self.current_source_idx]
+        image = self.source[start : self.current_source_idx]
         typ: TokenType = TokenType.IDENTIFIER_LITERAL
         if image in KEYWORDS:
             typ = TokenType.KEYWORD
@@ -204,8 +225,7 @@ class Lexer:
                         assert self.peek is not None
                         self._tokens.append(
                             Token(
-                                typ=TokenType(
-                                    self.current_character + self.peek),
+                                typ=TokenType(self.current_character + self.peek),
                                 image=self.current_character + self.peek,
                                 line=self.current_line,
                                 column=self.current_column - 2,
@@ -224,15 +244,18 @@ class Lexer:
                 self.increment()
             elif self.current_character.isdigit():  # integer literal
                 self._tokens.append(self.integer_literal())
-            elif (self.current_character.isalpha()
-                  or self.current_character in ("_")):  # identifier literal
+            elif self.current_character.isalpha() or self.current_character in (
+                "_"
+            ):  # identifier literal
                 self._tokens.append(self.identifier_literal())
             else:
                 assert False, f"Unknown character {self.current_character}"
         return self._tokens
 
     @classmethod
-    def from_file(cls, filename: Union[TextIOWrapper, str, Path], context: StageContext) -> "Lexer":
+    def from_file(
+        cls, filename: Union[TextIOWrapper, str, Path], context: StageContext
+    ) -> "Lexer":
         """
         Returns a Lexer instance from a file
         """

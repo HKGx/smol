@@ -1,5 +1,3 @@
-
-
 RETURN_TYPE = dict[str, "RETURN_TYPE"] | list["RETURN_TYPE"]
 
 

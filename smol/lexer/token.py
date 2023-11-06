@@ -45,7 +45,9 @@ class TokenType(Enum):
     @cache
     def first_characters() -> list[str]:
         return [
-            str(t.value)[0] for t in TokenType.__members__.values() if not isinstance(t.value, int)
+            str(t.value)[0]
+            for t in TokenType.__members__.values()
+            if not isinstance(t.value, int)
         ]
 
 
@@ -60,9 +62,11 @@ class Token:
         return self.typ in types
 
     def __str__(self):
-        return (f"Token(type=<{self.typ.name}>"
-                f", image=`{self.image}`"
-                f", position=[{self.line}:{self.column}])")
+        return (
+            f"Token(type=<{self.typ.name}>"
+            f", image=`{self.image}`"
+            f", position=[{self.line}:{self.column}])"
+        )
 
     def __repr__(self):
         return self.__str__()

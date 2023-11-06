@@ -6,14 +6,14 @@ from smol.parser.utils import Expression, Statement
 @dataclass
 class EqualityExpression(Expression):
     left: Expression
-    sign: Literal['=='] | Literal['!=']
+    sign: Literal["=="] | Literal["!="]
     right: Expression
 
 
 @dataclass
 class ComparisonExpression(Expression):
     left: Expression
-    sign: Literal['<'] | Literal[">"] | Literal[">="] | Literal["<="]
+    sign: Literal["<"] | Literal[">"] | Literal[">="] | Literal["<="]
     right: Expression
 
 
@@ -121,8 +121,6 @@ class BreakExpression(Expression):
 class ContinueExpression(Expression):
     pass
 
-
-# Type Expressions
 
 @dataclass
 class TypeExpression(Expression):

@@ -17,18 +17,20 @@ def overwrite_std_file(interpreter):
             s = string_type(length=i_len)
             s["__value__"] = read
             return s
+
         file["__file__"] = open(path["__value__"], "r")  # type: ignore
         file["read"] = iread
-        file["seek"] = lambda i: file["__file__"].seek(
-            i["__value__"])  # type: ignore
+        file["seek"] = lambda i: file["__file__"].seek(i["__value__"])  # type: ignore
         file["close"] = lambda: file["__file__"].close()  # type: ignore
         return file
+
     interpreter.scope.rec_set("open_file", iopen)
 
 
 def overwrite_std_os(interpreter):
     def ishell(value: RETURN_TYPE):
         os.system(value["__value__"])  # type: ignore
+
     interpreter.scope.rec_set("shell", ishell)
 
 
@@ -55,6 +57,7 @@ def overwrite_std_std(interpreter):
 
     def iprint(value: RETURN_TYPE):
         print(value[v_prop])  # type: ignore
+
     interpreter.scope.rec_set("str", istr)
     interpreter.scope.rec_set("print", iprint)
     interpreter.scope.rec_set("_charcode_at", ichar_at)

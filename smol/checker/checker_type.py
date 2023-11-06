@@ -7,8 +7,7 @@ from smol.parser.utils import Expression, Statement
 @dataclass(eq=True)
 class CheckerType:
     name: str
-    meta: dict[str, bool] = field(
-        init=False, default_factory=dict, compare=False)
+    meta: dict[str, bool] = field(init=False, default_factory=dict, compare=False)
 
 
 @dataclass(eq=True)
