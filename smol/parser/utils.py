@@ -1,6 +1,10 @@
 from dataclasses import dataclass, field
 
-from smol.lexer import Token
+from smol.lexer.lexer import Token
+
+
+class ParseException(Exception):
+    pass
 
 
 @dataclass
@@ -10,8 +14,7 @@ class Statement:
 
 @dataclass
 class Expression:
-    edges: tuple[Token, Token] | None = field(
-        default=None, kw_only=True)
+    edges: tuple[Token, Token] | None = field(default=None, kw_only=True)
 
     def source_position(self) -> str:
         if self.edges is None:

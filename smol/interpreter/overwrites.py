@@ -64,7 +64,7 @@ def overwrite_std_std(interpreter):
 
 
 OVERWRITE_TABLE = {
-    "std.file": overwrite_std_file,
-    "std.os": overwrite_std_os,
-    "std.std": overwrite_std_std,
+    "std/file": overwrite_std_file,
+    "std/os": overwrite_std_os,
+    "std/std": overwrite_std_std,
 }
